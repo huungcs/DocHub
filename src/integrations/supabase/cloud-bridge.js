@@ -33,6 +33,7 @@
   let authReadySettled = false;
   let connectedDriveToken = null;
   let googleProviderEnabled = null;
+  let workspaceLoadStatus = 'idle';
 
   // Khởi tạo IndexedDB cục bộ làm bộ đệm tốc độ cao
   const DB_NAME = 'dochub_cloud_cache_v1';
@@ -79,6 +80,11 @@
     } catch (_) {}
   }
 
+  // Browser cache is namespaced by Supabase user to prevent cross-account data leaks.
+  function userCacheKey(key) {
+    return `${currentUser?.id || 'guest'}:${key}`;
+  }
+
   // Đối tượng API thay thế cho window.DocHubAPI
   const api = {
     get connected() {
@@ -104,6 +110,9 @@
     },
     get googleProviderEnabled() {
       return googleProviderEnabled;
+    },
+    get workspaceLoadStatus() {
+      return workspaceLoadStatus;
     }
   };
 
@@ -236,8 +245,12 @@
    */
   api.loadState = async () => {
     await api.ready;
-    if (!currentUser || !supabase) return null;
+    if (!currentUser || !supabase) {
+      workspaceLoadStatus = 'unavailable';
+      return null;
+    }
 
+    workspaceLoadStatus = 'loading';
     try {
       const { data, error } = await supabase
         .from('user_workspaces')
@@ -246,19 +259,23 @@
         .maybeSingle();
 
       if (error) {
+        workspaceLoadStatus = 'error';
         console.warn('Lỗi đọc dữ liệu từ Supabase:', error);
         return null;
       }
 
       if (data && data.state) {
+        workspaceLoadStatus = 'loaded';
         revision = data.revision || 1;
         console.log(`DocHub: Đã tải không gian làm việc từ Supabase (Revision ${revision})`);
         return data.state;
       }
 
       // Người dùng mới: Chưa có workspace trong DB -> sẽ trả về null để app khởi tạo seed ban đầu
+      workspaceLoadStatus = 'not_found';
       return null;
     } catch (err) {
+      workspaceLoadStatus = 'error';
       console.error('DocHub loadState failed:', err);
       return null;
     }
@@ -313,7 +330,7 @@
    */
   api.putAsset = async (id, blob) => {
     // 1. Luôn lưu cache cục bộ để xem trước tức thì
-    await cacheSet('assets', id, blob);
+    await cacheSet('assets', userCacheKey(id), blob);
 
     // 2. Nếu có kết nối Google Drive, tải lên Drive của khách
     if (providerToken && googleDriveFolderId && window.DocHubDrive) {
@@ -326,7 +343,7 @@
           blob.type || 'application/octet-stream'
         );
         // Lưu ánh xạ ID nội bộ -> Google Drive File ID
-        await cacheSet('meta', id, { driveId: fileMeta.id, webViewLink: fileMeta.webViewLink });
+        await cacheSet('meta', userCacheKey(id), { driveId: fileMeta.id, webViewLink: fileMeta.webViewLink });
 
         // Ghi nhận vào bảng documents_index của Supabase nếu đang đăng nhập
         if (currentUser && supabase) {
@@ -352,17 +369,17 @@
    */
   api.getAsset = async (id) => {
     // 1. Kiểm tra cache IndexedDB
-    const cached = await cacheGet('assets', id);
+    const cached = await cacheGet('assets', userCacheKey(id));
     if (cached) return cached;
 
     // 2. Nếu không có trong cache, tải từ Google Drive
     if (providerToken && window.DocHubDrive) {
-      const meta = await cacheGet('meta', id);
+      const meta = await cacheGet('meta', userCacheKey(id));
       if (meta?.driveId) {
         try {
           const blob = await window.DocHubDrive.downloadFileBlob(providerToken, meta.driveId);
           if (blob) {
-            await cacheSet('assets', id, blob);
+            await cacheSet('assets', userCacheKey(id), blob);
             return blob;
           }
         } catch (e) {
@@ -377,12 +394,12 @@
    * Xóa tệp tài liệu
    */
   api.removeAsset = async (id) => {
-    await cacheDelete('assets', id);
+    await cacheDelete('assets', userCacheKey(id));
     if (providerToken && window.DocHubDrive) {
-      const meta = await cacheGet('meta', id);
+      const meta = await cacheGet('meta', userCacheKey(id));
       if (meta?.driveId) {
         await window.DocHubDrive.deleteFile(providerToken, meta.driveId);
-        await cacheDelete('meta', id);
+        await cacheDelete('meta', userCacheKey(id));
       }
     }
     if (currentUser && supabase) {

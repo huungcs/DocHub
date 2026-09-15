@@ -106,6 +106,8 @@ async function createHarness({ googleEnabled, session }) {
   assert.strictEqual(signedIn.api.isDriveConnected, true);
   assert.strictEqual(signedIn.api.authStatus, 'ready');
   assert.strictEqual(signedIn.calls.drive, 1);
+  assert.strictEqual(await signedIn.api.loadState(), null);
+  assert.strictEqual(signedIn.api.workspaceLoadStatus, 'not_found');
 
   const signedOut = await createHarness({ googleEnabled: true, session: null });
   assert.strictEqual(signedOut.api.connected, false);

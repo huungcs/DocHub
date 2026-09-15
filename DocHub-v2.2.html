@@ -1841,7 +1841,7 @@ window.DocHubMedia={init,open,typeOf,getSession:()=>session};
  */
 (async () => {
   'use strict';
-  const STORAGE_KEY = 'dochub.demo.v1';
+  const STORAGE_KEY_BASE = 'dochub.workspace.v2';
   const DB_NAME = 'dochub.demo.assets.v1'; // Compatible with the previous version.
   const PAGE_SIZE = 12;
   const MAX_FILE_SIZE = 250 * 1024 * 1024;
@@ -1972,6 +1972,28 @@ window.DocHubMedia={init,open,typeOf,getSession:()=>session};
     };
   }
 
+  function createCloudWorkspace(account) {
+    const seed=createSeed();
+    const name=account?.user_metadata?.full_name||account?.user_metadata?.name||account?.email?.split('@')[0]||'Người dùng';
+    const email=account?.email||'';
+    const root={...seed.folders.find(folder=>folder.id==='all'),ownerId:'u1',createdAt:new Date().toISOString(),updatedAt:new Date().toISOString()};
+    return {
+      ...seed,
+      folders:[root],documents:[],
+      users:[{id:'u1',name,email,department:'',groupIds:['g-system'],active:true}],
+      groups:[{id:'g-system',name:'Quản trị hệ thống',description:'Chủ sở hữu không gian làm việc'}],
+      acl:[{id:uid('acl'),resourceId:'all',principalId:'g-system',principalType:'group',role:'owner'}],
+      logs:[{id:uid('log'),at:new Date().toISOString(),actor:name,action:'Khởi tạo không gian làm việc',resourceId:'all',detail:'Không gian riêng cho tài khoản '+email+'.',icon:'sparkles'}],
+      preferences:{theme:'light',density:'comfortable',view:'grid',sort:'updated',lastFolder:'all',expanded:[],workspaceName:'Không gian của '+name},
+      mediaUpgrade:2,createdAt:new Date().toISOString()
+    };
+  }
+
+  function stateStorageKey() {
+    const accountId=window.DocHubAPI?.user?.id;
+    return accountId?`${STORAGE_KEY_BASE}.${accountId}`:`${STORAGE_KEY_BASE}.guest`;
+  }
+
   let storageWarning = '';
   function validState(data) {
     if (!data || data.version!==1 || !data.preferences || typeof data.preferences!=='object') return false;
@@ -1997,17 +2019,21 @@ window.DocHubMedia={init,open,typeOf,getSession:()=>session};
   }
   function loadState() {
     try {
-      const raw=localStorage.getItem(STORAGE_KEY);
+      const raw=localStorage.getItem(stateStorageKey());
       if(raw) {
         const parsed=JSON.parse(raw);
         if(validState(parsed)) return parsed;
         storageWarning='Dữ liệu cục bộ không hợp lệ. Đang dùng dữ liệu mẫu trong phiên này.';
       }
     } catch(error) { storageWarning='Trình duyệt không đọc được dữ liệu cục bộ. Bản mẫu vẫn dùng được trong phiên này.'; }
-    return createSeed();
+    return null;
   }
   const serverState=await window.DocHubAPI?.loadState();
-  let state=serverState&&validState(serverState)?serverState:loadState();
+  const cloudAccount=window.DocHubAPI?.connected?window.DocHubAPI.user:null;
+  const localState=loadState();
+  let state=serverState&&validState(serverState)?serverState:
+    localState&&validState(localState)?localState:
+    cloudAccount?createCloudWorkspace(cloudAccount):createSeed();
   // Add real, bundled multimedia samples once; never resurrect deleted records.
   function upgradeSamples() {
   if(!state.mediaUpgrade) {
@@ -2062,8 +2088,8 @@ window.DocHubMedia={init,open,typeOf,getSession:()=>session};
   function saveState() {
     state.preferences.expanded=[...ui.expanded];
     state.preferences.lastFolder=ui.folder;
-    window.DocHubAPI?.scheduleState(state);
-    try {localStorage.setItem(STORAGE_KEY,JSON.stringify(state));return true;}
+    if(window.DocHubAPI?.workspaceLoadStatus!=='error')window.DocHubAPI?.scheduleState(state);
+    try {localStorage.setItem(stateStorageKey(),JSON.stringify(state));return true;}
     catch(error) {toast('Không thể lưu cục bộ. Thay đổi hiện chỉ tồn tại trong phiên này.','warning');return false;}
   }
   function addLog(action,resourceId='all',detail='',symbol='edit') {
@@ -3132,7 +3158,7 @@ function openHelp() {
     if(id&&active(folder(id)))navigate(id,false);
   });
   window.addEventListener('storage',event=>{
-    if(event.key===STORAGE_KEY)toast('Dữ liệu đã thay đổi ở tab khác. Tải lại trang trước khi tiếp tục chỉnh sửa.','warning');
+    if(event.key===stateStorageKey())toast('Dữ liệu của tài khoản này đã thay đổi ở tab khác. Tải lại trang trước khi tiếp tục chỉnh sửa.','warning');
   });
   // Prevent the browser from navigating away when files are dropped.
   document.addEventListener('dragover',event=>{

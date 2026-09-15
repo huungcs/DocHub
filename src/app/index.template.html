@@ -1726,7 +1726,7 @@ async function open(id){
 }
 function header(){const s=session,it=s.item;return `<header class="studio-heading"><button class="icon-btn studio-back" data-studio="close" aria-label="Đóng trình xem">${ico('chevron')}</button><span class="studio-type ${escape(s.kind)}">${ico(s.kind==='image'?'image':s.kind==='video'?'play':'file')}</span><div class="studio-file-title"><h2 id="studioTitle">${escape(it.name)}<span>.${escape(it.ext||'file')}</span></h2><p>${escape(bridge.path(it.parentId))}</p></div><span class="studio-format">${escape((it.ext||'FILE').toUpperCase())}</span><div class="studio-top-actions">${btn('download','Tải xuống','download','studio-download')}${btn('save','Lưu bản sao','check','primary','id="studioSave" disabled')}</div></header><div class="studio-bar"><div class="studio-tabs" role="tablist" aria-label="Chế độ tài liệu"><button data-studio="mode" data-mode="view" role="tab" aria-selected="${s.mode==='view'}" class="${s.mode==='view'?'active':''}">${ico('eye')}<span>Xem tài liệu</span></button>${canEdit(s)?`<button data-studio="mode" data-mode="edit" role="tab" aria-selected="${s.mode==='edit'}" class="${s.mode==='edit'?'active':''}">${ico('edit')}<span>Chỉnh sửa</span></button>`:''}<button data-studio="mode" data-mode="info" role="tab" aria-selected="${s.mode==='info'}" class="${s.mode==='info'?'active':''}">${ico('info')}<span>Thông tin</span></button></div><div class="studio-version"><span class="status-dot"></span><span id="studioState" class="${s.dirty?'unsaved':''}">${s.dirty?'Có thay đổi chưa lưu':'Bản gốc được giữ nguyên'}</span></div></div>`;}
 async function render(){
- const s=session;if(!s)return;D().innerHTML=header()+`<div id="studioContent" class="studio-content kind-${s.kind}"></div><footer class="studio-footer"><span>${ico('shield')}${window.DocHubAPI?.connected?'Lưu tại máy chủ cục bộ của bạn':'Lưu trên trình duyệt này'} · Không gửi đến dịch vụ bên ngoài</span><span>${bridge.bytes(s.blob?.size||s.item.bytes)} · ${labelOf[s.kind]}</span></footer>`;
+ const s=session;if(!s)return;D().innerHTML=header()+`<div id="studioContent" class="studio-content kind-${s.kind}"></div><footer class="studio-footer"><span>${ico('shield')}${window.DocHubAPI?.isDriveConnected?'Tệp được lưu trong Google Drive của tài khoản này':window.DocHubAPI?.connected?'Dữ liệu được đồng bộ với Supabase':'Lưu trên trình duyệt này'}</span><span>${bridge.bytes(s.blob?.size||s.item.bytes)} · ${labelOf[s.kind]}</span></footer>`;
  $('#studioSave').disabled=!s.dirty;if(s.error){$('#studioContent').innerHTML=`<div class="studio-empty">${ico('file')}<h3>Tệp được giữ nguyên</h3><p>${escape(s.error)}</p><div>${btn('download','Tải tệp gốc','download','primary')}${btn('replace','Tải bản cập nhật','upload')}</div></div>`;return;}
  if(s.mode==='info'){renderInfo();return;}
  if(s.kind==='pdf')await renderPDF();else if(s.kind==='sheet')renderSheet();else if(s.kind==='word')renderWord();else if(s.kind==='image')renderImage();else if(s.kind==='video'||s.kind==='audio')renderMedia();else if(s.kind==='text')renderText();else renderOther();
@@ -1841,7 +1841,7 @@ window.DocHubMedia={init,open,typeOf,getSession:()=>session};
  */
 (async () => {
   'use strict';
-  const STORAGE_KEY = 'dochub.demo.v1';
+  const STORAGE_KEY_BASE = 'dochub.workspace.v2';
   const DB_NAME = 'dochub.demo.assets.v1'; // Compatible with the previous version.
   const PAGE_SIZE = 12;
   const MAX_FILE_SIZE = 250 * 1024 * 1024;
@@ -1972,6 +1972,28 @@ window.DocHubMedia={init,open,typeOf,getSession:()=>session};
     };
   }
 
+  function createCloudWorkspace(account) {
+    const seed=createSeed();
+    const name=account?.user_metadata?.full_name||account?.user_metadata?.name||account?.email?.split('@')[0]||'Người dùng';
+    const email=account?.email||'';
+    const root={...seed.folders.find(folder=>folder.id==='all'),ownerId:'u1',createdAt:new Date().toISOString(),updatedAt:new Date().toISOString()};
+    return {
+      ...seed,
+      folders:[root],documents:[],
+      users:[{id:'u1',name,email,department:'',groupIds:['g-system'],active:true}],
+      groups:[{id:'g-system',name:'Quản trị hệ thống',description:'Chủ sở hữu không gian làm việc'}],
+      acl:[{id:uid('acl'),resourceId:'all',principalId:'g-system',principalType:'group',role:'owner'}],
+      logs:[{id:uid('log'),at:new Date().toISOString(),actor:name,action:'Khởi tạo không gian làm việc',resourceId:'all',detail:'Không gian riêng cho tài khoản '+email+'.',icon:'sparkles'}],
+      preferences:{theme:'light',density:'comfortable',view:'grid',sort:'updated',lastFolder:'all',expanded:[],workspaceName:'Không gian của '+name},
+      mediaUpgrade:2,createdAt:new Date().toISOString()
+    };
+  }
+
+  function stateStorageKey() {
+    const accountId=window.DocHubAPI?.user?.id;
+    return accountId?`${STORAGE_KEY_BASE}.${accountId}`:`${STORAGE_KEY_BASE}.guest`;
+  }
+
   let storageWarning = '';
   function validState(data) {
     if (!data || data.version!==1 || !data.preferences || typeof data.preferences!=='object') return false;
@@ -1997,17 +2019,21 @@ window.DocHubMedia={init,open,typeOf,getSession:()=>session};
   }
   function loadState() {
     try {
-      const raw=localStorage.getItem(STORAGE_KEY);
+      const raw=localStorage.getItem(stateStorageKey());
       if(raw) {
         const parsed=JSON.parse(raw);
         if(validState(parsed)) return parsed;
         storageWarning='Dữ liệu cục bộ không hợp lệ. Đang dùng dữ liệu mẫu trong phiên này.';
       }
     } catch(error) { storageWarning='Trình duyệt không đọc được dữ liệu cục bộ. Bản mẫu vẫn dùng được trong phiên này.'; }
-    return createSeed();
+    return null;
   }
   const serverState=await window.DocHubAPI?.loadState();
-  let state=serverState&&validState(serverState)?serverState:loadState();
+  const cloudAccount=window.DocHubAPI?.connected?window.DocHubAPI.user:null;
+  const localState=loadState();
+  let state=serverState&&validState(serverState)?serverState:
+    localState&&validState(localState)?localState:
+    cloudAccount?createCloudWorkspace(cloudAccount):createSeed();
   // Add real, bundled multimedia samples once; never resurrect deleted records.
   function upgradeSamples() {
   if(!state.mediaUpgrade) {
@@ -2062,8 +2088,8 @@ window.DocHubMedia={init,open,typeOf,getSession:()=>session};
   function saveState() {
     state.preferences.expanded=[...ui.expanded];
     state.preferences.lastFolder=ui.folder;
-    window.DocHubAPI?.scheduleState(state);
-    try {localStorage.setItem(STORAGE_KEY,JSON.stringify(state));return true;}
+    if(window.DocHubAPI?.workspaceLoadStatus!=='error')window.DocHubAPI?.scheduleState(state);
+    try {localStorage.setItem(stateStorageKey(),JSON.stringify(state));return true;}
     catch(error) {toast('Không thể lưu cục bộ. Thay đổi hiện chỉ tồn tại trong phiên này.','warning');return false;}
   }
   function addLog(action,resourceId='all',detail='',symbol='edit') {
@@ -2355,7 +2381,7 @@ window.DocHubMedia={init,open,typeOf,getSession:()=>session};
         <section class="content-card" aria-label="Danh sách tài liệu">
           <div class="content-toolbar"><div class="content-tabs" role="tablist" aria-label="Lọc theo loại">${tabs.map(([key,label,count])=>`<button class="tab-button ${ui.tab===key?'active':''}" role="tab" aria-selected="${ui.tab===key}" data-action="tab" data-tab="${key}">${e(label)} <span class="tab-count">${count}</span></button>`).join('')}</div><div class="toolbar-controls"><div class="filter-search">${icon('search')}<input id="localSearch" type="search" value="${e(ui.localQuery)}" placeholder="Lọc trong thư mục..." aria-label="Lọc danh sách hiện tại"></div><button class="icon-btn sort-button" data-action="sort-menu" aria-label="Sắp xếp tài liệu" title="Sắp xếp">${icon('sort')}</button><button class="icon-btn cf-view-toggle" data-action="view" data-view="${currentPresentationView()==='grid'?'list':'grid'}" aria-label="${currentPresentationView()==='grid'?'Chuy\u1ec3n sang danh s\u00e1ch':'Chuy\u1ec3n sang d\u1ea1ng l\u01b0\u1edbi'}" title="${currentPresentationView()==='grid'?'Danh s\u00e1ch':'D\u1ea1ng l\u01b0\u1edbi'}">${icon(currentPresentationView()==='grid'?'list':'grid')}</button><div class="view-switch" role="group" aria-label="Kiểu hiển thị"><button class="${currentPresentationView()==='list'?'active':''}" data-action="view" data-view="list" aria-label="Dạng danh sách" aria-pressed="${currentPresentationView()==='list'}">${icon('list')}</button><button class="${currentPresentationView()==='grid'?'active':''}" data-action="view" data-view="grid" aria-label="Dạng lưới" aria-pressed="${currentPresentationView()==='grid'}">${icon('grid')}</button></div></div></div>
           ${table}
-          <div class="table-footer"><span>${items.length?`${(ui.page-1)*PAGE_SIZE+1}–${Math.min(ui.page*PAGE_SIZE,items.length)} trong ${items.length} mục`:'0 mục'}${ui.selected.size?` · ${ui.selected.size} đã chọn`:''}</span><div class="pagination">${totalPages>1?`<button class="icon-btn page-prev" data-action="page" data-page="${ui.page-1}" ${ui.page===1?'disabled':''} aria-label="Trang trước">${icon('chevron','tiny')}</button><span class="page-number">${ui.page} / ${totalPages}</span><button class="icon-btn" data-action="page" data-page="${ui.page+1}" ${ui.page===totalPages?'disabled':''} aria-label="Trang sau">${icon('chevron','tiny')}</button>`:`<span>${icon('check','tiny')} ${window.DocHubAPI?.connected?'Lưu tại máy chủ cục bộ':'Lưu trên trình duyệt'}</span>`}</div></div>
+          <div class="table-footer"><span>${items.length?`${(ui.page-1)*PAGE_SIZE+1}–${Math.min(ui.page*PAGE_SIZE,items.length)} trong ${items.length} mục`:'0 mục'}${ui.selected.size?` · ${ui.selected.size} đã chọn`:''}</span><div class="pagination">${totalPages>1?`<button class="icon-btn page-prev" data-action="page" data-page="${ui.page-1}" ${ui.page===1?'disabled':''} aria-label="Trang trước">${icon('chevron','tiny')}</button><span class="page-number">${ui.page} / ${totalPages}</span><button class="icon-btn" data-action="page" data-page="${ui.page+1}" ${ui.page===totalPages?'disabled':''} aria-label="Trang sau">${icon('chevron','tiny')}</button>`:`<span>${icon('check','tiny')} ${window.DocHubAPI?.connected?'Đồng bộ riêng theo tài khoản':'Lưu trên trình duyệt'}</span>`}</div></div>
         </section>
         <div class="drop-zone" id="dropZone">${icon('upload')}<div>Kéo thả tài liệu vào đây hoặc <button data-action="upload">chọn từ thiết bị</button><small>Mọi định dạng: ảnh, video, PDF, Excel, Word, ZIP... · Tối đa 250 MB/tệp</small></div></div>
         <div class="workspace-tip"><span>${icon('sparkles')}Mọi thứ gọn gàng. Mọi tài liệu đúng chỗ.</span><span>${icon('info')}Phân quyền: Ảnh đại diện → Cài đặt.</span></div>`;
@@ -3132,7 +3158,7 @@ function openHelp() {
     if(id&&active(folder(id)))navigate(id,false);
   });
   window.addEventListener('storage',event=>{
-    if(event.key===STORAGE_KEY)toast('Dữ liệu đã thay đổi ở tab khác. Tải lại trang trước khi tiếp tục chỉnh sửa.','warning');
+    if(event.key===stateStorageKey())toast('Dữ liệu của tài khoản này đã thay đổi ở tab khác. Tải lại trang trước khi tiếp tục chỉnh sửa.','warning');
   });
   // Prevent the browser from navigating away when files are dropped.
   document.addEventListener('dragover',event=>{
