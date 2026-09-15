@@ -11,15 +11,24 @@ fs.mkdirSync(assetsPath, { recursive: true });
 
 let html = fs.readFileSync(srcPath, 'utf8');
 
-// 1. Inject Supabase JS and DocHub Cloud Bridge scripts in <head>
-const headScripts = `
+// 1. Inject High-Speed Preconnect in <head> and Cloud Bridge scripts before </head> to avoid blocking CSS
+const preconnectTags = `
   <!-- High-Speed Preconnect & DNS-Prefetch -->
   <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
   <link rel="dns-prefetch" href="https://cdn.jsdelivr.net">
   <link rel="preconnect" href="https://ethrdeaeemkjgolmkrmq.supabase.co" crossorigin>
   <link rel="dns-prefetch" href="https://ethrdeaeemkjgolmkrmq.supabase.co">
+  <script>
+    try {
+      if (localStorage.getItem('dochub.demo_mode') === 'true') {
+        document.documentElement.classList.add('demo-mode-active');
+      }
+    } catch(_) {}
+  </script>
+`;
 
-  <!-- Supabase JS & DocHub Cloud Integrations -->
+const bridgeScripts = `
+  <!-- Supabase JS & DocHub Cloud Integrations (Loaded after inline CSS to prevent render-blocking) -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="./assets/client-config.js"></script>
   <script src="./assets/search-engine.js"></script>
@@ -27,7 +36,8 @@ const headScripts = `
   <script src="./assets/supabase-cloud-bridge.js"></script>
 `;
 
-html = html.replace('<head>', '<head>' + headScripts);
+html = html.replace('<head>', '<head>' + preconnectTags);
+html = html.replace('</head>', bridgeScripts + '</head>');
 
 // 2. Replace the old local mock because the Supabase bridge provides window.DocHubAPI.
 const oldApiRegex = /<script>\s*\/\*\s*Optional same-origin local backend[\s\S]*?window\.DocHubAPI=api;\s*\}\)\(\);\s*<\/script>/;
@@ -109,6 +119,9 @@ const newAccountCase = `case 'account': {
         case 'google-logout':
           if (window.DocHubAPI?.logout) {
             try {
+              if (typeof sessionStorage !== 'undefined') sessionStorage.removeItem('dochub.demo_mode');
+              if (typeof localStorage !== 'undefined') localStorage.removeItem('dochub.demo_mode');
+              document.documentElement.classList.remove('demo-mode-active');
               await window.DocHubAPI.logout();
             } catch (error) {
               toast(error?.message || 'Không thể đăng xuất.', 'error');
@@ -163,10 +176,12 @@ const authUiScript = `
 
       const connected = api.connected && api.user;
       const driveConnected = connected && api.isDriveConnected;
-      const busy = ['checking', 'redirecting', 'connecting_drive', 'signing_out'].includes(api.authStatus);
+      const hasStoredSession = typeof localStorage !== 'undefined' && Object.keys(localStorage).some(k => k.startsWith('sb-') && k.endsWith('-auth-token'));
+      const busy = ['redirecting', 'connecting_drive', 'signing_out'].includes(api.authStatus) || (api.authStatus === 'checking' && hasStoredSession);
       const needsConfig = api.authStatus === 'configuration_required' || api.googleProviderEnabled === false;
 
-      const isDemo = typeof sessionStorage !== 'undefined' && sessionStorage.getItem('dochub.demo_mode') === 'true';
+      const isDemo = (typeof sessionStorage !== 'undefined' && sessionStorage.getItem('dochub.demo_mode') === 'true') ||
+        (typeof localStorage !== 'undefined' && localStorage.getItem('dochub.demo_mode') === 'true');
       if (isDemo && !connected) {
         lockWorkspace(false);
       } else {
@@ -179,7 +194,7 @@ const authUiScript = `
       }
       if (loginButtonText) {
         loginButtonText.textContent = api.authStatus === 'redirecting' ? 'Đang chuyển đến Google…' :
-          api.authStatus === 'checking' ? 'Đang kiểm tra phiên đăng nhập…' :
+          api.authStatus === 'checking' && hasStoredSession ? 'Đang kiểm tra phiên đăng nhập…' :
           api.authStatus === 'signing_out' ? 'Đang đăng xuất…' :
           needsConfig ? 'Google OAuth chưa được cấu hình' :
           api.authStatus === 'error' || api.authStatus === 'unavailable' ? 'Thử đăng nhập lại với Google' :
@@ -264,6 +279,10 @@ const authUiScript = `
         if (typeof sessionStorage !== 'undefined') {
           sessionStorage.setItem('dochub.demo_mode', 'true');
         }
+        if (typeof localStorage !== 'undefined') {
+          localStorage.setItem('dochub.demo_mode', 'true');
+        }
+        document.documentElement.classList.add('demo-mode-active');
         lockWorkspace(false);
         if (statusBadge) statusBadge.style.display = '';
         if (statusText) statusText.textContent = 'Bản trải nghiệm (Dữ liệu mẫu)';

@@ -4,7 +4,7 @@ const fs=require('node:fs');
 const vm=require('node:vm');
 const source=fs.readFileSync(require('node:path').join(__dirname,'../../src/app/index.template.html'),'utf8');
 const block=source.split("} else if(kind==='user') {")[1].split("} else if(kind==='group') {")[0];
-test('Permissions page renders its add-member button without media helpers',()=>{
+test('Permission inspector directs member setup to the members page',()=>{
  const page='function permissionsPage'+source.split('function permissionsPage')[1].split('  function renderPermissionPickerList')[0];
  const html=vm.runInNewContext(page+';permissionsPage()',{
   ui:{permissionFolder:'all',inspectUser:'u1'},folder:id=>id==='all'?{id:'all',name:'All'}:null,active:Boolean,
@@ -12,7 +12,10 @@ test('Permissions page renders its add-member button without media helpers',()=>
   state:{users:[],preferences:{}},sectionHeader:(a,b,c)=>a+b+c,e:String,icon:()=>'',window:{},
   ACTIONS:{},ROLES:{},user:()=>null,inspectUserMessage:()=>''
  });
- assert.match(html,/data-action="new-user"/);assert.match(html,/Thêm nhân sự/);
+ assert.doesNotMatch(html,/data-action="new-user"/);
+ assert.match(html,/data-section="users"/);
+ assert.match(html,/Kiểm tra quyền truy cập/);
+ assert.ok(html.indexOf("Quyền của thành viên") < html.indexOf("Điều chỉnh quyền thư mục (nâng cao)"));
 });
 async function submit({role='viewer',scope='team',id='',denied=false}={}){
  const state={users:id?[{id,email:'old@test.com'}]:[],groups:[],acl:[]};
