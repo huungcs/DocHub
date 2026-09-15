@@ -34,6 +34,8 @@
   let connectedDriveToken = null;
   let googleProviderEnabled = null;
   let workspaceLoadStatus = 'idle';
+  let organization = null;
+  let authorizationStatus = 'idle';
 
   // Khởi tạo IndexedDB cục bộ làm bộ đệm tốc độ cao
   const DB_NAME = 'dochub_cloud_cache_v1';
@@ -113,8 +115,31 @@
     },
     get workspaceLoadStatus() {
       return workspaceLoadStatus;
+    },
+    get organization() {
+      return organization;
+    },
+    get authorizationStatus() {
+      return authorizationStatus;
     }
   };
+
+  async function ensureOrganization() {
+    if (!supabase || !currentUser) return null;
+    authorizationStatus = 'loading';
+    const suggestedName = currentUser.user_metadata?.full_name || currentUser.user_metadata?.name || currentUser.email;
+    const { data, error } = await supabase.rpc('dochub_bootstrap_organization', {
+      p_name: suggestedName ? `Không gian của ${suggestedName}` : null
+    });
+    if (error) {
+      authorizationStatus = 'error';
+      throw new Error(`Không khởi tạo được phân quyền máy chủ: ${error.message}`);
+    }
+    const row = Array.isArray(data) ? data[0] : data;
+    organization = row ? { id: row.organization_id, role: row.organization_role } : null;
+    authorizationStatus = organization ? 'ready' : 'error';
+    return organization;
+  }
 
   async function checkGoogleProvider() {
     const controller = new AbortController();
@@ -161,6 +186,8 @@
     currentUser = session?.user || null;
 
     if (!currentUser) {
+      organization = null;
+      authorizationStatus = 'idle';
       providerToken = null;
       googleDriveFolderId = null;
       connectedDriveToken = null;
@@ -174,6 +201,15 @@
     if (session.provider_token) sessionStorage.setItem('dochub_google_token', session.provider_token);
     authStatus = providerToken ? 'connecting_drive' : 'authenticated';
     emitAuth(event);
+
+    try {
+      await ensureOrganization();
+    } catch (authorizationError) {
+      authStatus = 'authorization_error';
+      authError = authorizationError.message;
+      emitAuth('AUTHORIZATION_ERROR');
+      return true;
+    }
 
     if (providerToken && window.DocHubDrive && connectedDriveToken !== providerToken) {
       try {
@@ -303,6 +339,17 @@
 
     saveQueue = saveQueue.then(async () => {
       try {
+        if (!organization) await ensureOrganization();
+        if (organization && ['owner', 'admin'].includes(organization.role)) {
+          const { error: authorizationError } = await supabase.rpc('dochub_sync_authorization_snapshot', {
+            p_organization_id: organization.id,
+            p_folders: snapshot.folders || [],
+            p_users: snapshot.users || [],
+            p_groups: snapshot.groups || [],
+            p_acl: snapshot.acl || []
+          });
+          if (authorizationError) throw authorizationError;
+        }
         const nextRevision = revision + 1;
         const { error } = await supabase
           .from('user_workspaces')
@@ -325,10 +372,36 @@
     return saveQueue;
   };
 
+  /** Ask PostgreSQL for the effective permission of the authenticated user. */
+  api.authorize = async (folderUid, action) => {
+    await api.ready;
+    if (!currentUser || !supabase) return false;
+    if (!organization) await ensureOrganization();
+    const { data, error } = await supabase.rpc('dochub_can_folder_action', {
+      p_organization_id: organization.id,
+      p_folder_uid: folderUid,
+      p_action: action,
+      p_user_id: currentUser.id
+    });
+    if (error) throw new Error(`Không kiểm tra được quyền trên máy chủ: ${error.message}`);
+    return data === true;
+  };
+
+  api.requirePermission = async (folderUid, action) => {
+    const allowed = await api.authorize(folderUid, action);
+    if (!allowed) {
+      const error = new Error('Bạn không có quyền thực hiện thao tác này trong thư mục đã chọn.');
+      error.code = 'permission_denied';
+      throw error;
+    }
+    return true;
+  };
+
   /**
    * Lưu trữ tệp tài liệu: Đẩy lên Google Drive của khách hàng và lưu cache cục bộ
    */
-  api.putAsset = async (id, blob) => {
+  api.putAsset = async (id, blob, parentFolderId = 'all') => {
+    await api.requirePermission(parentFolderId, 'create');
     // 1. Luôn lưu cache cục bộ để xem trước tức thì
     await cacheSet('assets', userCacheKey(id), blob);
 
@@ -355,6 +428,8 @@
             bytes: blob.size || 0,
             mime_type: blob.type,
             google_drive_file_id: fileMeta.id,
+            organization_id: organization?.id || null,
+            parent_folder_id: parentFolderId,
             updated_at: new Date().toISOString()
           }, { onConflict: 'user_id,doc_uid' });
         }
@@ -367,7 +442,8 @@
   /**
    * Lấy tệp tài liệu: Đọc từ cache trước, nếu không có thì tải từ Google Drive
    */
-  api.getAsset = async (id) => {
+  api.getAsset = async (id, parentFolderId = 'all') => {
+    await api.requirePermission(parentFolderId, 'read');
     // 1. Kiểm tra cache IndexedDB
     const cached = await cacheGet('assets', userCacheKey(id));
     if (cached) return cached;
@@ -393,7 +469,8 @@
   /**
    * Xóa tệp tài liệu
    */
-  api.removeAsset = async (id) => {
+  api.removeAsset = async (id, parentFolderId = 'all') => {
+    await api.requirePermission(parentFolderId, 'delete');
     await cacheDelete('assets', userCacheKey(id));
     if (providerToken && window.DocHubDrive) {
       const meta = await cacheGet('meta', userCacheKey(id));
@@ -403,7 +480,10 @@
       }
     }
     if (currentUser && supabase) {
-      await supabase.from('documents_index').delete().match({ user_id: currentUser.id, doc_uid: id });
+      let deletion = supabase.from('documents_index').delete().eq('doc_uid', id);
+      deletion = organization?.id ? deletion.eq('organization_id', organization.id) : deletion.eq('user_id', currentUser.id);
+      const { error } = await deletion;
+      if (error) throw error;
     }
   };
 

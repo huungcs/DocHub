@@ -19,7 +19,7 @@ function createStorage() {
 
 async function createHarness({ googleEnabled, session }) {
   const events = [];
-  const calls = { oauth: null, signOut: null, drive: 0, reload: 0 };
+  const calls = { oauth: null, signOut: null, drive: 0, reload: 0, rpc: [] };
   let authCallback = null;
   const auth = {
     getSession: async () => ({ data: { session }, error: null }),
@@ -38,6 +38,14 @@ async function createHarness({ googleEnabled, session }) {
   };
   const client = {
     auth,
+    rpc: async (name, args) => {
+      calls.rpc.push({ name, args });
+      if (name === 'dochub_bootstrap_organization') {
+        return { data: [{ organization_id: 'org-1', organization_role: 'owner' }], error: null };
+      }
+      if (name === 'dochub_can_folder_action') return { data: true, error: null };
+      return { data: null, error: null };
+    },
     from: () => ({
       select() { return this; },
       eq() { return this; },
@@ -105,6 +113,11 @@ async function createHarness({ googleEnabled, session }) {
   assert.strictEqual(signedIn.api.connected, true);
   assert.strictEqual(signedIn.api.isDriveConnected, true);
   assert.strictEqual(signedIn.api.authStatus, 'ready');
+  assert.strictEqual(signedIn.api.organization.id, 'org-1');
+  assert.strictEqual(signedIn.api.organization.role, 'owner');
+  assert.strictEqual(signedIn.api.authorizationStatus, 'ready');
+  assert.strictEqual(await signedIn.api.authorize('all', 'manage'), true);
+  assert.ok(signedIn.calls.rpc.some(call => call.name === 'dochub_bootstrap_organization'));
   assert.strictEqual(signedIn.calls.drive, 1);
   assert.strictEqual(await signedIn.api.loadState(), null);
   assert.strictEqual(signedIn.api.workspaceLoadStatus, 'not_found');

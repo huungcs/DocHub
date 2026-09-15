@@ -50,7 +50,8 @@ const newAccountCase = `case 'account': {
           const isConnected = api?.connected;
           const usr = api?.user;
           const usrName = usr?.user_metadata?.full_name || usr?.email || user('u1').name;
-          const usrRole = isConnected ? 'Tài khoản đám mây (Supabase + Google Drive)' : 'Tài khoản mẫu cục bộ';
+          const isDemo = typeof sessionStorage !== 'undefined' && sessionStorage.getItem('dochub.demo_mode') === 'true';
+          const usrRole = isConnected ? 'Tài khoản đám mây (Supabase + Google Drive)' : isDemo ? 'Bản trải nghiệm Demo (Dữ liệu mẫu)' : 'Tài khoản mẫu cục bộ';
           
           let menuHtml = \`<p class="menu-label">\${e(usrName)} · \${e(usrRole)}</p>\`;
           if (!isConnected || !api?.isDriveConnected) {
@@ -64,10 +65,19 @@ const newAccountCase = `case 'account': {
           if (isConnected) {
             menuHtml += \`<div class="menu-divider"></div>\`;
             menuHtml += menuItem('google-logout', 'Đăng xuất tài khoản', 'trash');
+          } else if (isDemo) {
+            menuHtml += \`<div class="menu-divider"></div>\`;
+            menuHtml += menuItem('exit-demo', 'Thoát bản Demo (Quay lại đăng nhập)', 'close');
           }
           showMenu(target, menuHtml);
           break;
         }
+        case 'exit-demo':
+          if (typeof sessionStorage !== 'undefined') {
+            sessionStorage.removeItem('dochub.demo_mode');
+          }
+          location.reload();
+          break;
         case 'google-auth':
           if (window.DocHubAPI?.loginWithGoogle) {
             try {
@@ -137,7 +147,12 @@ const authUiScript = `
       const busy = ['checking', 'redirecting', 'connecting_drive', 'signing_out'].includes(api.authStatus);
       const needsConfig = api.authStatus === 'configuration_required' || api.googleProviderEnabled === false;
 
-      lockWorkspace(!connected);
+      const isDemo = typeof sessionStorage !== 'undefined' && sessionStorage.getItem('dochub.demo_mode') === 'true';
+      if (isDemo && !connected) {
+        lockWorkspace(false);
+      } else {
+        lockWorkspace(!connected);
+      }
       if (authScreen) authScreen.setAttribute('aria-busy', busy ? 'true' : 'false');
       if (loginButton) {
         loginButton.disabled = busy || needsConfig;
@@ -211,6 +226,19 @@ const authUiScript = `
           }
           renderAuthUi();
         }
+      });
+    }
+
+    const demoButton = document.getElementById('btnEnterDemo');
+    if (demoButton) {
+      demoButton.addEventListener('click', () => {
+        if (typeof sessionStorage !== 'undefined') {
+          sessionStorage.setItem('dochub.demo_mode', 'true');
+        }
+        lockWorkspace(false);
+        if (statusBadge) statusBadge.style.display = '';
+        if (statusText) statusText.textContent = 'Bản trải nghiệm (Dữ liệu mẫu)';
+        if (dot) dot.style.background = 'var(--amber)';
       });
     }
 

@@ -45,3 +45,9 @@ test('IndexedDB file cache is namespaced by Supabase user id', () => {
   assert.match(cloudBridge, /cacheSet\('assets', userCacheKey\(id\), blob\)/);
   assert.match(cloudBridge, /cacheGet\('meta', userCacheKey\(id\)\)/);
 });
+
+test('Auth gateway includes a button to enter demo mode with pre-existing sample data', () => {
+  assert.match(template, /id="btnEnterDemo"/);
+  assert.match(buildScript, /sessionStorage\.setItem\('dochub\.demo_mode', 'true'\)/);
+  assert.match(buildScript, /btnEnterDemo/);
+});

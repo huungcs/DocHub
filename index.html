@@ -173,8 +173,9 @@ svg.icon.tiny{width:15px;height:15px}
 .global-search input{width:100%;background:var(--surface-soft);border-color:var(--line);padding-left:40px!important;padding-right:66px!important;font-size:12px;min-height:41px!important}
 .global-search kbd{position:absolute;right:10px;color:var(--subtle);font:9px var(--font);border:1px solid var(--line-strong);background:var(--surface);padding:2px 5px;border-radius:4px;pointer-events:none}
 .topbar-spacer{flex:1}
-.demo-label{font-size:10px;color:var(--muted);display:inline-flex;align-items:center;gap:6px;white-space:nowrap;margin-right:8px}
-.demo-label span{width:5px;height:5px;border-radius:50%;background:var(--amber)}
+.demo-label{font-size:10px;color:var(--muted);display:inline-flex;align-items:center;gap:6px;white-space:nowrap;margin-right:8px;flex-shrink:0;line-height:1.4}
+.demo-label>span:first-child{width:5px;height:5px;flex:0 0 5px;border-radius:50%;background:var(--amber)}
+.demo-label #cloudStatusText{width:auto;height:auto;background:none;border-radius:0}
 .notification-button{position:relative}
 .notification-dot{position:absolute;top:8px;right:9px;width:6px;height:6px;border:1px solid var(--surface);border-radius:50%;background:var(--brand)}
 .topbar-divider{height:28px;border-left:1px solid var(--line);margin:0 5px}
@@ -1366,6 +1367,10 @@ body.auth-locked{overflow:hidden}
 .auth-google .auth-spinner{display:none;width:18px;height:18px;border:2px solid #c9d4e5;border-top-color:#3269ed;border-radius:50%;animation:auth-spin .7s linear infinite}
 .auth-google.is-busy .auth-google-logo{display:none}
 .auth-google.is-busy .auth-spinner{display:block}
+.auth-demo-btn{width:100%;min-height:46px;margin-top:10px;display:flex;align-items:center;justify-content:center;gap:9px;padding:10px 16px;border:1px solid #d8e0eb;border-radius:11px;background:#f8fafd;color:#2556c7;font-size:13px;font-weight:620;box-shadow:0 2px 6px #20375d08;transition:transform .15s,border-color .15s,box-shadow .15s,background .15s;cursor:pointer}
+.auth-demo-btn:hover{transform:translateY(-1px);border-color:#a8c4fb;background:#edf3ff;box-shadow:0 6px 16px #3269ed18}
+.auth-demo-btn:active{transform:translateY(0)}
+.auth-demo-btn .icon{width:17px;height:17px;color:#3269ed}
 .auth-status{min-height:20px;margin-top:13px;color:#7b899e;font-size:11px;line-height:1.55;text-align:center}
 .auth-status.is-error{padding:9px 10px;border-radius:8px;background:#fff0f1;color:#a23b4b}
 .auth-divider{display:flex;align-items:center;gap:12px;margin:27px 0 20px;color:#9aa5b6;font-size:10px}
@@ -1476,6 +1481,10 @@ body.auth-locked{overflow:hidden}
         <svg class="auth-google-logo" viewBox="0 0 24 24" aria-hidden="true"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/></svg>
         <span class="auth-spinner" aria-hidden="true"></span>
         <span id="loginGoogleText">Đang kiểm tra phiên đăng nhập…</span>
+      </button>
+      <button class="auth-demo-btn" id="btnEnterDemo" type="button" title="Truy cập ngay bản mẫu với đầy đủ tài liệu và thư mục minh họa">
+        <svg class="icon" aria-hidden="true"><use href="#i-sparkles"/></svg>
+        <span>Vào xem Demo (Dữ liệu mẫu có sẵn)</span>
       </button>
       <p class="auth-status" id="loginStatus" role="status" aria-live="polite">Vui lòng chờ trong giây lát.</p>
       <div class="auth-divider">Bảo vệ không gian của bạn</div>
@@ -2137,11 +2146,18 @@ window.DocHubMedia={init,open,typeOf,getSession:()=>session};
       transaction.onabort=()=>reject(transaction.error || new Error('Transaction aborted'));
     });
   }
-  async function saveAsset(id,file) {
+  async function requirePermission(folderId,action) {
+    if(!window.DocHubAPI?.connected || !window.DocHubAPI?.requirePermission)return true;
+    return window.DocHubAPI.requirePermission(folderId,action);
+  }
+  async function saveAsset(id,file,parentFolderId='all') {
     if(window.DocHubAPI?.connected) {
       if(DocHubAPI.conflict)throw new Error('Dữ liệu đã thay đổi ở nơi khác. Tải lại trước khi lưu.');
-      try{await DocHubAPI.putAsset(id,file);return 'server';}
-      catch(error){toast('Chưa lưu được lên máy chủ. Đang thử lưu trên trình duyệt này.','warning');}
+      try{await DocHubAPI.putAsset(id,file,parentFolderId);return 'server';}
+      catch(error){
+        if(error?.code==='permission_denied'||/không có quyền/i.test(error?.message||''))throw error;
+        toast('Chưa lưu được lên máy chủ. Đang thử lưu trên trình duyệt này.','warning');
+      }
     }
     try{await assetOperation('readwrite','put',id,file);sessionFiles.delete(id);return 'device';}
     catch(error){sessionFiles.set(id,file);return 'session';}
@@ -2155,15 +2171,15 @@ window.DocHubMedia={init,open,typeOf,getSession:()=>session};
     let result;
     if(sessionFiles.has(id))result=sessionFiles.get(id);
     else {
-      if(window.DocHubAPI?.connected)result=await DocHubAPI.getAsset(id);
+      if(window.DocHubAPI?.connected)result=await DocHubAPI.getAsset(id,item?.parentId||'all');
       if(!result)try{result=(await assetOperation('readonly','get',id))?.blob;}catch(error){}
     }
     if(!result)return null;
     return item?.mime&&result.type!==item.mime?new Blob([result],{type:item.mime}):result;
   }
-  async function removeAsset(id) {
+  async function removeAsset(id,parentFolderId='all') {
     sessionFiles.delete(id);
-    if(window.DocHubAPI?.connected)try{await DocHubAPI.removeAsset(id);}catch(error){toast('Chưa xóa được bản tệp trên máy chủ.','warning');}
+    if(window.DocHubAPI?.connected)try{await DocHubAPI.removeAsset(id,parentFolderId);}catch(error){toast(error?.message||'Chưa xóa được bản tệp trên máy chủ.','warning');throw error;}
     try{await assetOperation('readwrite','delete',id);}catch(error){}
   }
   function avatar(person,small=false) {
@@ -2433,17 +2449,17 @@ window.DocHubMedia={init,open,typeOf,getSession:()=>session};
       <section class="settings-card">
         <div class="settings-card-heading"><div><h3>Người và nhóm có quyền truy cập</h3><p>${rules.length} thiết lập quyền tại thư mục này</p></div><button class="btn primary sm" data-action="add-access">${icon('plus')}Thêm quyền</button></div>
         ${rules.length?`<table class="permissions-table"><thead><tr><th scope="col">Đối tượng</th><th scope="col">Vai trò</th><th scope="col">Nguồn quyền</th><th scope="col"><span class="visually-hidden">Thu hồi</span></th></tr></thead><tbody>${rules.map(rule=>`<tr><td>${principalMarkup(rule)}</td><td>${rule.inherited?`<span class="role-static">${e(ROLES[rule.role].label)}</span>`:`<select class="role-select" data-acl-role="${e(rule.id)}" aria-label="Vai trò của ${e(principalName(rule))}">${rolesOptions(rule.role)}</select>`}</td><td>${rule.inherited?`<button class="inherit-origin" data-action="permission-parent" data-id="${e(rule.sourceId)}">Kế thừa ${icon('link','tiny')}</button><span class="permission-source">${e(folder(rule.sourceId)?.name)}</span>`:`<span class="badge blue">Quyền riêng</span>`}</td><td>${rule.inherited?`<span class="muted" title="Chỉnh sửa tại thư mục nguồn">${icon('lock','tiny')}</span>`:`<button class="icon-btn small" data-action="revoke-access" data-id="${e(rule.id)}" aria-label="Thu hồi quyền ${e(principalName(rule))}" title="Thu hồi quyền">${icon('close')}</button>`}</td></tr>`).join('')}</tbody></table>`:
-        `<div class="empty-state compact"><span class="empty-symbol">${icon('lock')}</span><h3>Chưa có quyền truy cập</h3><p>Trong mô phỏng, người dùng không được cấp quyền sẽ không có quyền nào.</p></div>`}
+        `<div class="empty-state compact"><span class="empty-symbol">${icon('lock')}</span><h3>Chưa có quyền truy cập</h3><p>Người dùng không được cấp quyền sẽ bị máy chủ từ chối truy cập.</p></div>`}
         <p class="principal-caption">Quyền kế thừa chỉ sửa tại thư mục nguồn. Nhiều quyền của một người được cộng gộp; không có quy tắc từ chối riêng.</p>
       </section>
-      <section class="settings-card"><div class="settings-card-heading"><div><h3>Kiểm tra quyền người dùng</h3><p>Xem quyền hiệu lực và nguồn cấp quyền trong mô phỏng.</p></div>${icon('eye')}</div>
+      <section class="settings-card"><div class="settings-card-heading"><div><h3>Kiểm tra quyền người dùng</h3><p>Xem quyền hiệu lực và nguồn cấp quyền đang đồng bộ với máy chủ.</p></div>${icon('eye')}</div>
         <div class="inspector-controls"><select id="inspectUser" aria-label="Người dùng cần kiểm tra">${state.users.map(person=>`<option value="${e(person.id)}" ${person.id===ui.inspectUser?'selected':''}>${e(person.name)}${!person.active?' — Đã tạm dừng':''}</option>`).join('')}</select></div>
         <div class="permission-chips">${Object.entries(ACTIONS).map(([key,label])=>`<span class="permission-chip ${check.permissions.includes(key)?'allowed':''}">${icon(check.permissions.includes(key)?'check':'close')}${e(label)}</span>`).join('')}</div>
         <div class="source-list">${check.sources.length?check.sources.map(rule=>`<p>${icon('link','tiny')} ${e(principalName(rule))} → <strong>${e(ROLES[rule.role].label)}</strong> · ${rule.inherited?`Kế thừa từ ${e(folder(rule.sourceId)?.name)}`:'Cấp trực tiếp tại thư mục này'}</p>`).join(''):`<p>${user(ui.inspectUser)?.active?'Không có quyền phù hợp. Mặc định không được truy cập.':'Tài khoản đã tạm dừng nên không có quyền hiệu lực.'}</p>`}</div>
         <details class="matrix-details"><summary>Chi tiết các vai trò và quyền tương ứng</summary><div class="matrix-scroll"><table class="role-matrix"><thead><tr><th>Vai trò</th>${Object.values(ACTIONS).map(label=>`<th>${e(label)}</th>`).join('')}</tr></thead><tbody>${Object.values(ROLES).map(role=>`<tr><td>${e(role.label)}</td>${Object.keys(ACTIONS).map(key=>`<td class="${role.permissions.includes(key)?'yes':''}">${role.permissions.includes(key)?'✓':'—'}</td>`).join('')}</tr>`).join('')}</tbody></table></div></details>
       </section>
-      <div class="info-callout warning">${icon('info')}<span>Đây là mô phỏng giao diện phân quyền. Bạn đang thao tác với tài khoản quản trị mẫu; quyền thật phải được kiểm tra trên máy chủ, không phải bằng JavaScript trong trình duyệt.</span></div>
-      <p class="settings-footnote" style="margin-top:14px">${icon('check')}Thay đổi được lưu ngay trên thiết bị. Không gửi email, không chia sẻ dữ liệu ra ngoài.</p>`;
+      <div class="info-callout">${icon('shield')}<span>Khi đăng nhập Cloud, Supabase RLS kiểm tra quyền bằng danh tính thật trước mọi thao tác tệp. JavaScript chỉ hiển thị kết quả và không thể tự cấp thêm quyền.</span></div>
+      <p class="settings-footnote" style="margin-top:14px">${icon('check')}Thay đổi thành viên, nhóm và ACL được đồng bộ vào mô hình phân quyền của tổ chức.</p>`;
   }
   function usersPage() {
     const q=normalize(ui.settingsQuery);
@@ -2451,7 +2467,7 @@ window.DocHubMedia={init,open,typeOf,getSession:()=>session};
     return `${sectionHeader('Người dùng','Quản lý hồ sơ mẫu và thành viên của các nhóm.',`<button class="btn primary" data-action="new-user">${icon('plus')}Thêm người</button>`)}
       <div class="settings-search">${icon('search')}<input id="settingsSearch" type="search" value="${e(ui.settingsQuery)}" placeholder="Tìm theo tên, email hoặc phòng ban..." aria-label="Tìm người dùng"></div>
       <div class="settings-list">${list.length?list.map(person=>`<div class="settings-list-row"><div class="principal">${avatar(person)}<div><strong>${e(person.name)} ${person.id==='u1'?'<span class="badge blue">Bạn</span>':''}</strong><small>${e(person.email)}</small><div class="group-badges">${person.groupIds.map(id=>state.groups.find(g=>g.id===id)).filter(Boolean).map(group=>`<span class="badge">${e(group.name)}</span>`).join('')}</div></div></div><span class="badge ${person.active?'green':'red'}">${person.active?'Hoạt động':'Tạm dừng'}</span><div class="row-actions"><button class="icon-btn" data-action="edit-user" data-id="${e(person.id)}" aria-label="Sửa người dùng ${e(person.name)}">${icon('edit')}</button></div></div>`).join(''):`<div class="empty-state compact"><h3>Không tìm thấy người dùng</h3></div>`}</div>
-      <div class="info-callout neutral" style="margin-top:17px">${icon('info')}<span>Tài khoản trong bản mẫu chỉ là dữ liệu minh họa. Việc thêm người không tạo tài khoản đăng nhập và không gửi thư mời.</span></div>`;
+      <div class="info-callout neutral" style="margin-top:17px">${icon('info')}<span>Thành viên được mời bằng email. Khi họ đăng nhập Google đúng email, Supabase tự liên kết tài khoản với tổ chức và áp dụng quyền đã cấp.</span></div>`;
   }
   function groupsPage() {
     const q=normalize(ui.settingsQuery);
@@ -2631,7 +2647,8 @@ window.DocHubMedia={init,open,typeOf,getSession:()=>session};
   function requestDelete(ids) {
     const roots=compactSelection(ids),targets=deletionSet(roots);
     if(!targets.length)return;
-    confirmAction({title:'Chuyển vào thùng rác?',description:`${roots.length===1?`“${entity(roots[0]).name}”`: `${roots.length} mục đã chọn`} và nội dung bên trong sẽ được chuyển vào thùng rác.\nTổng cộng ${targets.length} mục. Bạn có thể khôi phục trong Cài đặt → Thùng rác.`,danger:true,label:'Chuyển vào thùng rác',onConfirm:()=>{
+    confirmAction({title:'Chuyển vào thùng rác?',description:`${roots.length===1?`“${entity(roots[0]).name}”`: `${roots.length} mục đã chọn`} và nội dung bên trong sẽ được chuyển vào thùng rác.\nTổng cộng ${targets.length} mục. Bạn có thể khôi phục trong Cài đặt → Thùng rác.`,danger:true,label:'Chuyển vào thùng rác',onConfirm:async()=>{
+      for(const rootId of roots){const item=entity(rootId);await requirePermission(item.kind==='folder'?item.id:item.parentId,'delete');}
       const batch=uid('deleted'),now=new Date().toISOString(),currentAncestors=ancestorIds(ui.folder);
       targets.forEach(item=>{item.deletedAt=now;item.deleteBatch=batch;});
       ui.selected.clear();
@@ -2640,12 +2657,13 @@ window.DocHubMedia={init,open,typeOf,getSession:()=>session};
       toast(`Đã chuyển ${targets.length} mục vào thùng rác.`,'success','Hoàn tác',()=>restoreDeleted(targets.map(item=>item.id),batch));
     }});
   }
-  function restoreDeleted(ids,batch=null) {
+  async function restoreDeleted(ids,batch=null) {
     const targets=ids.map(entity).filter(item=>item?.deletedAt&&(!batch||item.deleteBatch===batch));
     const targetIds=new Set(targets.map(item=>item.id));
     if(!targets.length)return toast('Không còn mục nào cần khôi phục.','warning');
     if(targets.some(item=>folder(item.parentId)?.deletedAt&&!targetIds.has(item.parentId)))
       return toast('Hãy khôi phục thư mục cha trước khi khôi phục mục này.','warning');
+    for(const item of targets)await requirePermission(item.parentId||'all','create');
     targets.sort((a,b)=>a.kind===b.kind?ancestorIds(a.id).length-ancestorIds(b.id).length:a.kind==='folder'?-1:1);
     for(const item of targets) {
       if(!folder(item.parentId))item.parentId='all';
@@ -2655,17 +2673,17 @@ window.DocHubMedia={init,open,typeOf,getSession:()=>session};
     commit(`Khôi phục ${targets.length} mục`,targets[0].id,targets.map(item=>item.name).join(', '),'restore');
     toast(`Đã khôi phục ${targets.length} mục.`);
   }
-  function restoreRoot(id) {
+  async function restoreRoot(id) {
     const item=entity(id);if(!item?.deletedAt)return;
     const subtree=deletionSet([id],false).filter(target=>target.deletedAt&&target.deleteBatch===item.deleteBatch);
-    restoreDeleted(subtree.map(target=>target.id));
+    await restoreDeleted(subtree.map(target=>target.id));
   }
   function requestPurge(ids,empty=false) {
     const targets=deletionSet(ids,false).filter(item=>item.deletedAt);
     if(!targets.length)return;
     confirmAction({title:empty?'Dọn toàn bộ thùng rác?':'Xóa vĩnh viễn?',description:`${targets.length} mục và các tệp gốc tương ứng sẽ bị xóa khỏi bộ nhớ của bản mẫu trên thiết bị này.\nThao tác này không thể hoàn tác.`,danger:true,label:'Xóa vĩnh viễn',onConfirm:async()=>{
       const removed=new Set(targets.map(item=>item.id));
-      for(const item of targets.filter(i=>i.kind==='file'))await removeAsset(item.id);
+      for(const item of targets.filter(i=>i.kind==='file'))await removeAsset(item.id,item.parentId);
       state.folders=state.folders.filter(item=>!removed.has(item.id));
       state.documents=state.documents.filter(item=>!removed.has(item.id));
       state.acl=state.acl.filter(rule=>!removed.has(rule.resourceId));
@@ -2676,19 +2694,20 @@ window.DocHubMedia={init,open,typeOf,getSession:()=>session};
 
   function openUserForm(id=null) {
     const person=id?user(id):null;
-    openForm({title:person?'Chỉnh sửa người dùng':'Thêm người dùng mẫu',subtitle:'Không gửi thư mời hoặc tạo đăng nhập thật',symbol:'user',kind:'user',resourceId:id||'',
+    openForm({title:person?'Chỉnh sửa thành viên':'Mời thành viên',subtitle:'Thành viên được liên kết bằng email khi đăng nhập Google',symbol:'user',kind:'user',resourceId:id||'',
       body:`<div class="field"><label for="userName">Họ và tên</label><input id="userName" name="name" value="${e(person?.name||'')}" required maxlength="100" placeholder="Nhập họ tên"></div><div class="field"><label for="userEmail">Email</label><input id="userEmail" name="email" type="email" value="${e(person?.email||'')}" required maxlength="150" placeholder="ten@example.com"></div><div class="field"><label for="userDepartment">Phòng ban</label><input id="userDepartment" name="department" value="${e(person?.department||'')}" maxlength="100" placeholder="Ví dụ: Phòng hành chính"></div><div class="field"><span class="field-label">Nhóm làm việc</span><div class="checkbox-list">${state.groups.map(group=>`<label class="checkbox-option"><input type="checkbox" name="groupIds" value="${e(group.id)}" ${person?.groupIds.includes(group.id)?'checked':''}><span>${e(group.name)}</span></label>`).join('')}</div></div><div class="field"><label class="inline-check"><input type="checkbox" name="active" ${!person||person.active?'checked':''} ${id==='u1'?'disabled':''}><span>Tài khoản đang hoạt động ${id==='u1'?'(giữ lại tài khoản quản trị mẫu)':''}</span></label></div>`,submit:person?'Lưu người dùng':'Thêm người dùng'});
   }
   function openGroupForm(id=null) {
     const group=id?state.groups.find(item=>item.id===id):null;
     openForm({title:group?'Chỉnh sửa nhóm':'Tạo nhóm làm việc',symbol:'users',kind:'group',resourceId:id||'',
-      body:`<div class="field"><label for="groupName">Tên nhóm</label><input id="groupName" name="name" value="${e(group?.name||'')}" required maxlength="100" placeholder="Ví dụ: Ban dự án"></div><div class="field"><label for="groupDescription">Mô tả nhóm</label><input id="groupDescription" name="description" value="${e(group?.description||'')}" maxlength="250" placeholder="Nhiệm vụ hoặc phạm vi của nhóm"></div><div class="field"><span class="field-label">Thành viên</span><div class="checkbox-list">${state.users.map(person=>`<label class="checkbox-option"><input type="checkbox" name="memberIds" value="${e(person.id)}" ${group&&person.groupIds.includes(group.id)?'checked':''}><span>${e(person.name)}</span></label>`).join('')}</div><p class="field-hint">Thêm vào nhóm sẽ cộng các quyền được cấp cho nhóm đó trong mô phỏng.</p></div>`,submit:group?'Lưu nhóm':'Tạo nhóm'});
+      body:`<div class="field"><label for="groupName">Tên nhóm</label><input id="groupName" name="name" value="${e(group?.name||'')}" required maxlength="100" placeholder="Ví dụ: Ban dự án"></div><div class="field"><label for="groupDescription">Mô tả nhóm</label><input id="groupDescription" name="description" value="${e(group?.description||'')}" maxlength="250" placeholder="Nhiệm vụ hoặc phạm vi của nhóm"></div><div class="field"><span class="field-label">Thành viên</span><div class="checkbox-list">${state.users.map(person=>`<label class="checkbox-option"><input type="checkbox" name="memberIds" value="${e(person.id)}" ${group&&person.groupIds.includes(group.id)?'checked':''}><span>${e(person.name)}</span></label>`).join('')}</div><p class="field-hint">Quyền nhóm được Supabase áp dụng cho từng thành viên đã đăng nhập.</p></div>`,submit:group?'Lưu nhóm':'Tạo nhóm'});
   }
   function deleteGroup(id) {
     const group=state.groups.find(item=>item.id===id);
     if(!group||id==='g-system')return;
     const rules=state.acl.filter(rule=>rule.principalType==='group'&&rule.principalId===id);
-    confirmAction({title:'Xóa nhóm làm việc?',description:`Xóa nhóm “${group.name}” cùng ${rules.length} thiết lập quyền cấp cho nhóm này.\nNgười dùng và tài liệu không bị xóa.`,danger:true,label:'Xóa nhóm',onConfirm:()=>{
+    confirmAction({title:'Xóa nhóm làm việc?',description:`Xóa nhóm “${group.name}” cùng ${rules.length} thiết lập quyền cấp cho nhóm này.\nNgười dùng và tài liệu không bị xóa.`,danger:true,label:'Xóa nhóm',onConfirm:async()=>{
+      await requirePermission('all','manage');
       state.groups=state.groups.filter(item=>item.id!==id);
       state.users.forEach(person=>person.groupIds=person.groupIds.filter(groupId=>groupId!==id));
       state.acl=state.acl.filter(rule=>!(rule.principalType==='group'&&rule.principalId===id));
@@ -2705,7 +2724,8 @@ window.DocHubMedia={init,open,typeOf,getSession:()=>session};
     const current=folder(ui.permissionFolder);if(!current?.parentId)return;
     if(current.inherit) {
       const inherited=inheritedRules(current.id).filter(rule=>rule.inherited);
-      confirmAction({title:'Ngừng kế thừa quyền?',description:`“${current.name}” sẽ không còn nhận quyền từ các thư mục phía trên.\nQuyền trực tiếp hiện có vẫn được giữ.`,checkbox:'Sao chép quyền đang kế thừa thành quyền trực tiếp',label:'Ngừng kế thừa',onConfirm:copy=>{
+      confirmAction({title:'Ngừng kế thừa quyền?',description:`“${current.name}” sẽ không còn nhận quyền từ các thư mục phía trên.\nQuyền trực tiếp hiện có vẫn được giữ.`,checkbox:'Sao chép quyền đang kế thừa thành quyền trực tiếp',label:'Ngừng kế thừa',onConfirm:async copy=>{
+        await requirePermission(current.id,'manage');
         if(copy)for(const rule of inherited) {
           const own=state.acl.find(a=>a.resourceId===current.id&&a.principalId===rule.principalId&&a.principalType===rule.principalType);
           if(!own)state.acl.push({id:uid('acl'),resourceId:current.id,principalId:rule.principalId,principalType:rule.principalType,role:rule.role});
@@ -2715,14 +2735,16 @@ window.DocHubMedia={init,open,typeOf,getSession:()=>session};
         commit('Ngừng kế thừa quyền',current.id,copy?'Đã sao chép quyền đang kế thừa thành quyền riêng.':'Không sao chép quyền kế thừa; chỉ giữ quyền riêng hiện có.','shield');
         toast('Đã chuyển sang quyền riêng.');
       }});
-    } else confirmAction({title:'Bật kế thừa quyền?',description:`“${current.name}” sẽ nhận thêm các quyền từ thư mục cha.\nQuyền riêng hiện có được giữ lại và cộng gộp, không bị xóa.`,label:'Bật kế thừa',onConfirm:()=>{
+    } else confirmAction({title:'Bật kế thừa quyền?',description:`“${current.name}” sẽ nhận thêm các quyền từ thư mục cha.\nQuyền riêng hiện có được giữ lại và cộng gộp, không bị xóa.`,label:'Bật kế thừa',onConfirm:async()=>{
+      await requirePermission(current.id,'manage');
       current.inherit=true;commit('Bật kế thừa quyền',current.id,'Giữ lại quyền riêng và cộng gộp quyền từ thư mục cha.','shield');toast('Đã bật kế thừa quyền.');
     }});
   }
   function revokeAccess(id) {
     const rule=state.acl.find(item=>item.id===id);if(!rule||rule.resourceId!==ui.permissionFolder)return;
     const name=principalName(rule);
-    confirmAction({title:'Thu hồi quyền trực tiếp?',description:`Gỡ quyền “${ROLES[rule.role].label}” của ${name} tại thư mục này.\nCác quyền khác thông qua nhóm hoặc kế thừa vẫn có thể còn hiệu lực.`,danger:true,label:'Thu hồi quyền',onConfirm:()=>{
+    confirmAction({title:'Thu hồi quyền trực tiếp?',description:`Gỡ quyền “${ROLES[rule.role].label}” của ${name} tại thư mục này.\nCác quyền khác thông qua nhóm hoặc kế thừa vẫn có thể còn hiệu lực.`,danger:true,label:'Thu hồi quyền',onConfirm:async()=>{
+      await requirePermission(rule.resourceId,'manage');
       state.acl=state.acl.filter(item=>item.id!==id);
       commit(`Thu hồi quyền của ${name}`,rule.resourceId,`Gỡ quyền trực tiếp: ${ROLES[rule.role].label}.`,'shield');
       toast('Đã thu hồi quyền trực tiếp.');
@@ -2762,7 +2784,7 @@ window.DocHubMedia={init,open,typeOf,getSession:()=>session};
         if(file.size>MAX_FILE_SIZE){rejected.push(`${file.name}: vượt quá 250 MB`);continue;}
         let name=nameParts.join('.').trim().replace(/[\\/\u0000-\u001f]/g,'').slice(0,90)||'Tài liệu';
         name=uniqueName(name,parentId);
-        const id=uid('doc'),assetStorage=await saveAsset(id,file),now=new Date().toISOString();
+        const id=uid('doc'),assetStorage=await saveAsset(id,file,ui.folder),now=new Date().toISOString();
         if(assetStorage==='session')sessionCount++;
         state.documents.push({id,parentId,name,ext,bytes:file.size,ownerId:'u1',description:'',
           updatedAt:now,createdAt:now,starred:false,kind:'file',sample:false,source:'upload',
@@ -2833,6 +2855,7 @@ function openHelp() {
       if(kind==='new-folder') {
         const name=cleanName(data.get('name')),parentId=String(data.get('parentId'));
         if(!active(folder(parentId)))throw new Error('Thư mục cha không còn tồn tại.');
+        await requirePermission(parentId,'create');
         if(duplicateName(name,parentId))throw new Error('Đã có một mục cùng tên trong thư mục này.');
         const now=new Date().toISOString();
         state.folders.push({id:uid('folder'),parentId,name,description:String(data.get('description')||'').trim(),kind:'folder',inherit:true,ownerId:'u1',createdAt:now,updatedAt:now,starred:false,deletedAt:null});
@@ -2841,6 +2864,7 @@ function openHelp() {
         toast('Đã tạo thư mục mới.');
       } else if(kind==='rename') {
         const item=entity(id);if(!active(item))throw new Error('Mục này không còn tồn tại.');
+        await requirePermission(item.kind==='folder'?item.id:item.parentId,'edit');
         const name=cleanName(data.get('name'));
         if(duplicateName(name,item.parentId,[id]))throw new Error('Đã có một mục cùng tên trong thư mục này.');
         const old=item.name;item.name=name;item.updatedAt=new Date().toISOString();
@@ -2851,6 +2875,7 @@ function openHelp() {
         if(content.length>64000)throw new Error('Nội dung không được vượt quá 64.000 ký tự.');
         let item=id?doc(id):null;const parentId=item?.parentId||ui.folder;
         if(id&&!active(item))throw new Error('Tài liệu không còn tồn tại.');
+        await requirePermission(parentId,item?'edit':'create');
         if(duplicateName(name,parentId,id?[id]:[]))throw new Error('Đã có một mục cùng tên trong thư mục này.');
         const now=new Date().toISOString();
         if(item)Object.assign(item,{name,content,bytes:new TextEncoder().encode(content).length,updatedAt:now});
@@ -2863,6 +2888,8 @@ function openHelp() {
         const destination=String(data.get('parentId'));
         if(!active(folder(destination)))throw new Error('Thư mục đích không còn tồn tại.');
         const items=movingIds.map(entity).filter(active);
+        await requirePermission(destination,'create');
+        for(const movingItem of items)await requirePermission(movingItem.kind==='folder'?movingItem.id:movingItem.parentId,'move');
         if(items.some(item=>item.kind==='folder'&&descendantIds(item.id).includes(destination)))throw new Error('Không thể di chuyển thư mục vào chính nó hoặc thư mục con.');
         const names=new Set();
         for(const item of items) {
@@ -2877,6 +2904,7 @@ function openHelp() {
         commit(`Di chuyển ${changed.length} mục`,destination,`${previous} → ${fullPath(destination)}. Quyền kế thừa được tính lại.`,'move');
         toast('Đã di chuyển. Quyền kế thừa đã được tính lại trong mô phỏng.');
       } else if(kind==='user') {
+        await requirePermission('all','manage');
         const name=cleanName(data.get('name')),email=String(data.get('email')||'').trim().toLowerCase();
         if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))throw new Error('Email chưa đúng định dạng.');
         if(state.users.some(person=>person.id!==id&&person.email.toLowerCase()===email))throw new Error('Email này đã có trong danh sách.');
@@ -2884,9 +2912,10 @@ function openHelp() {
         if(id==='u1'&&!groupIds.includes('g-system'))throw new Error('Giữ tài khoản quản trị mẫu trong nhóm Quản trị hệ thống.');
         const fields={name,email,department:String(data.get('department')||'').trim(),groupIds,active:id==='u1'||data.has('active')};
         if(id)Object.assign(user(id),fields);else state.users.push({id:uid('user'),...fields});
-        commit(id?'Cập nhật người dùng mẫu':'Thêm người dùng mẫu','all',`${name} · ${email}. Thành viên nhóm được cập nhật.`,'user');
-        toast('Đã lưu người dùng mẫu. Không có thư mời được gửi.');
+        commit(id?'Cập nhật thành viên':'Mời thành viên','all',`${name} · ${email}. Thành viên nhóm được cập nhật.`,'user');
+        toast('Đã lưu thành viên và đồng bộ quyền lên máy chủ.');
       } else if(kind==='group') {
+        await requirePermission('all','manage');
         const name=cleanName(data.get('name'));
         if(state.groups.some(group=>group.id!==id&&normalize(group.name)===normalize(name)))throw new Error('Tên nhóm đã tồn tại.');
         const members=new Set(data.getAll('memberIds').map(String));
@@ -2896,6 +2925,7 @@ function openHelp() {
         state.users.forEach(person=>{person.groupIds=person.groupIds.filter(existing=>existing!==groupId);if(members.has(person.id))person.groupIds.push(groupId);});
         commit(id?'Cập nhật nhóm làm việc':'Tạo nhóm làm việc','all',`${name} · ${members.size} thành viên.`,'users');toast('Đã lưu nhóm và thành viên.');
       } else if(kind==='access') {
+        await requirePermission(id,'manage');
         const [principalType,principalId]=String(data.get('principal')).split(':'),role=String(data.get('role'));
         if(!['group','user'].includes(principalType)||!ROLES[role])throw new Error('Vui lòng chọn đối tượng và vai trò hợp lệ.');
         const exists=principalType==='group'?state.groups.some(group=>group.id===principalId):state.users.some(person=>person.id===principalId&&person.active);
@@ -2905,8 +2935,9 @@ function openHelp() {
         if(rule)rule.role=role;
         else {rule={id:uid('acl'),resourceId:id,principalId,principalType,role};state.acl.push(rule);}
         commit(`Cấp quyền cho ${principalName(rule)}`,id,`${previous} → ${ROLES[role].label}. Quyền trực tiếp.`,'shield');
-        toast('Đã lưu quyền truy cập trong mô phỏng.');
+        toast('Đã lưu quyền truy cập và chuyển tới Supabase.');
       } else if(kind==='workspace') {
+        await requirePermission('all','manage');
         state.preferences.workspaceName=cleanName(data.get('name'));
         commit('Đổi tên không gian làm việc','all',state.preferences.workspaceName,'building');toast('Đã cập nhật tên không gian.');
       }
@@ -3007,7 +3038,8 @@ function openHelp() {
           const isConnected = api?.connected;
           const usr = api?.user;
           const usrName = usr?.user_metadata?.full_name || usr?.email || user('u1').name;
-          const usrRole = isConnected ? 'Tài khoản đám mây (Supabase + Google Drive)' : 'Tài khoản mẫu cục bộ';
+          const isDemo = typeof sessionStorage !== 'undefined' && sessionStorage.getItem('dochub.demo_mode') === 'true';
+          const usrRole = isConnected ? 'Tài khoản đám mây (Supabase + Google Drive)' : isDemo ? 'Bản trải nghiệm Demo (Dữ liệu mẫu)' : 'Tài khoản mẫu cục bộ';
           
           let menuHtml = `<p class="menu-label">${e(usrName)} · ${e(usrRole)}</p>`;
           if (!isConnected || !api?.isDriveConnected) {
@@ -3021,10 +3053,19 @@ function openHelp() {
           if (isConnected) {
             menuHtml += `<div class="menu-divider"></div>`;
             menuHtml += menuItem('google-logout', 'Đăng xuất tài khoản', 'trash');
+          } else if (isDemo) {
+            menuHtml += `<div class="menu-divider"></div>`;
+            menuHtml += menuItem('exit-demo', 'Thoát bản Demo (Quay lại đăng nhập)', 'close');
           }
           showMenu(target, menuHtml);
           break;
         }
+        case 'exit-demo':
+          if (typeof sessionStorage !== 'undefined') {
+            sessionStorage.removeItem('dochub.demo_mode');
+          }
+          location.reload();
+          break;
         case 'google-auth':
           if (window.DocHubAPI?.loginWithGoogle) {
             try {
@@ -3079,7 +3120,7 @@ function openHelp() {
       settingsSearchTimer=setTimeout(()=>{ui.settingsQuery=value;renderSettings();},120);
     }
   });
-  document.addEventListener('change',event=>{
+  document.addEventListener('change',async event=>{
     const target=event.target;
     if(target.matches('[data-select]')) {
       target.checked?ui.selected.add(target.dataset.select):ui.selected.delete(target.dataset.select);
@@ -3095,6 +3136,7 @@ function openHelp() {
     else if(target.matches('[data-acl-role]')) {
       const rule=state.acl.find(item=>item.id===target.dataset.aclRole);
       if(rule&&rule.resourceId===ui.permissionFolder&&ROLES[target.value]) {
+        await requirePermission(rule.resourceId,'manage');
         const previous=rule.role;rule.role=target.value;
         commit(`Đổi vai trò của ${principalName(rule)}`,rule.resourceId,`${ROLES[previous].label} → ${ROLES[rule.role].label}.`,'shield');
         toast('Đã cập nhật vai trò.');
@@ -3210,7 +3252,7 @@ function openHelp() {
   async function saveEditedCopy(id,blob,ext,suffix=' - chỉnh sửa') {
     const old=doc(id);if(!active(old)||!active(folder(old.parentId)))throw new Error('Thư mục hoặc tệp không còn tồn tại.');
     if(blob.size>MAX_FILE_SIZE)throw new Error('Bản chỉnh sửa vượt 250 MB.');
-    const newId=uid('doc'),assetStorage=await saveAsset(newId,blob),now=new Date().toISOString();
+    const newId=uid('doc'),assetStorage=await saveAsset(newId,blob,s.item.parentId),now=new Date().toISOString();
     const item={id:newId,parentId:old.parentId,name:uniqueName(old.name.slice(0,75)+suffix,old.parentId),ext,bytes:blob.size,
       mime:blob.type||mimeFor(ext),ownerId:'u1',description:old.description||'',kind:'file',sample:false,
       source:'upload',assetStorage,derivedFromId:id,createdAt:now,updatedAt:now,starred:false,deletedAt:null};
@@ -3615,7 +3657,12 @@ function openHelp() {
       const busy = ['checking', 'redirecting', 'connecting_drive', 'signing_out'].includes(api.authStatus);
       const needsConfig = api.authStatus === 'configuration_required' || api.googleProviderEnabled === false;
 
-      lockWorkspace(!connected);
+      const isDemo = typeof sessionStorage !== 'undefined' && sessionStorage.getItem('dochub.demo_mode') === 'true';
+      if (isDemo && !connected) {
+        lockWorkspace(false);
+      } else {
+        lockWorkspace(!connected);
+      }
       if (authScreen) authScreen.setAttribute('aria-busy', busy ? 'true' : 'false');
       if (loginButton) {
         loginButton.disabled = busy || needsConfig;
@@ -3689,6 +3736,19 @@ function openHelp() {
           }
           renderAuthUi();
         }
+      });
+    }
+
+    const demoButton = document.getElementById('btnEnterDemo');
+    if (demoButton) {
+      demoButton.addEventListener('click', () => {
+        if (typeof sessionStorage !== 'undefined') {
+          sessionStorage.setItem('dochub.demo_mode', 'true');
+        }
+        lockWorkspace(false);
+        if (statusBadge) statusBadge.style.display = '';
+        if (statusText) statusText.textContent = 'Bản trải nghiệm (Dữ liệu mẫu)';
+        if (dot) dot.style.background = 'var(--amber)';
       });
     }
 

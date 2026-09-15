@@ -18,14 +18,17 @@ CREATE TABLE IF NOT EXISTS public.user_profiles (
 -- Bật RLS cho user_profiles
 ALTER TABLE public.user_profiles ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Users can view own profile" ON public.user_profiles;
 CREATE POLICY "Users can view own profile"
   ON public.user_profiles FOR SELECT
   USING (auth.uid() = id);
 
+DROP POLICY IF EXISTS "Users can update own profile" ON public.user_profiles;
 CREATE POLICY "Users can update own profile"
   ON public.user_profiles FOR UPDATE
   USING (auth.uid() = id);
 
+DROP POLICY IF EXISTS "Users can insert own profile" ON public.user_profiles;
 CREATE POLICY "Users can insert own profile"
   ON public.user_profiles FOR INSERT
   WITH CHECK (auth.uid() = id);
@@ -46,6 +49,7 @@ CREATE TABLE IF NOT EXISTS public.user_workspaces (
 -- Bật RLS cho user_workspaces
 ALTER TABLE public.user_workspaces ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Users can only access own workspace" ON public.user_workspaces;
 CREATE POLICY "Users can only access own workspace"
   ON public.user_workspaces FOR ALL
   USING (auth.uid() = user_id)
@@ -72,6 +76,7 @@ CREATE TABLE IF NOT EXISTS public.documents_index (
 -- Bật RLS cho documents_index
 ALTER TABLE public.documents_index ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Users can only access own documents" ON public.documents_index;
 CREATE POLICY "Users can only access own documents"
   ON public.documents_index FOR ALL
   USING (auth.uid() = user_id)
