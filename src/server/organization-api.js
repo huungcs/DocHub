@@ -26,6 +26,7 @@ async function body(req){
 }
 function createApi(env=process.env,fetcher=fetch,logger=console){
  const base=env.SUPABASE_URL?.trim().replace(/\/$/,''),service=env.SUPABASE_SERVICE_ROLE_KEY?.trim(),key=env.DOCHUB_TOKEN_KEY||service;
+ const authCache=new Map(),driveTokenCache=new Map();
  async function jsonFetch(url,options){
   const stage=url.includes('/auth/v1/')?'supabase-auth':url.includes('/rest/v1/')?'supabase-database':url.includes('oauth2.googleapis.com')?'google-token':'google-api';
   let r;
@@ -43,16 +44,31 @@ function createApi(env=process.env,fetcher=fetch,logger=console){
   if(!base||!service)throw fail(503,'Máy chủ chưa cấu hình kết nối tổ chức.');
   try{const target=new URL(base);if(target.protocol!=='https:'||target.username||target.password||target.search||target.hash||target.pathname!=='/')throw Error();}catch{throw Object.assign(fail(503,'SUPABASE_URL trên máy chủ không hợp lệ.'),{diagnostic:{stage:'configuration',code:'INVALID_SUPABASE_URL'}});}
   const bearer=/^Bearer (.+)$/i.exec(req.headers.authorization||'')?.[1];if(!bearer)throw fail(401,'Vui lòng đăng nhập.');
-  const user=await jsonFetch(`${base}/auth/v1/user`,{headers:{apikey:service,Authorization:`Bearer ${bearer}`}});
   const org=url.searchParams.get('organization');if(!/^[0-9a-f-]{36}$/i.test(org||''))throw fail(400,'Thiếu tổ chức hợp lệ.');
+  const cacheKey=crypto.createHash('sha256').update(bearer+':'+org).digest('hex');
+  const cachedAuth=authCache.get(cacheKey);if(cachedAuth&&cachedAuth.expiresAt>Date.now())return cachedAuth.val;
+  const user=await jsonFetch(`${base}/auth/v1/user`,{headers:{apikey:service,Authorization:`Bearer ${bearer}`}});
   const members=await db(`organization_members?organization_id=eq.${org}&user_id=eq.${encodeURIComponent(user.id)}&status=eq.active&select=*`);
   if(members.length!==1)throw fail(403,'Bạn không thuộc không gian này.');
   const organizations=await db(`organizations?id=eq.${org}&select=*`);if(!organizations[0])throw fail(404,'Không tìm thấy tổ chức.');
-  return {org,user,bearer,member:members[0],organization:organizations[0]};
+  const authObj={org,user,bearer,member:members[0],organization:organizations[0]};
+  if(authCache.size>200){const now=Date.now();for(const [k,v] of authCache)if(v.expiresAt<=now)authCache.delete(k);if(authCache.size>200)authCache.clear();}
+  authCache.set(cacheKey,{val:authObj,expiresAt:Date.now()+60000});
+  return authObj;
  }
  async function allowed(c,folder,action){if(!await rpc('dochub_can_folder_action',{p_organization_id:c.org,p_folder_uid:folder,p_action:action,p_user_id:c.user.id},c.bearer))throw fail(403,'Bạn không có quyền thực hiện thao tác trong thư mục này.');}
  async function refresh(refreshToken){return jsonFetch('https://oauth2.googleapis.com/token',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams({grant_type:'refresh_token',refresh_token:refreshToken,client_id:env.GOOGLE_OAUTH_CLIENT_ID,client_secret:env.GOOGLE_OAUTH_CLIENT_SECRET})});}
- async function ownerToken(c){const rows=await db(`organization_drive_connections?organization_id=eq.${c.org}&select=*`);if(!rows[0]||rows[0].owner_id!==c.organization.owner_id)throw fail(409,'Chủ sở hữu cần kết nối kho Drive doanh nghiệp.');return (await refresh(unseal(rows[0].encrypted_refresh_token,key,c.org))).access_token;}
+ async function ownerToken(c){
+  const cached=driveTokenCache.get(c.org);
+  if(cached&&cached.expiresAt>Date.now())return cached.token;
+  const rows=await db(`organization_drive_connections?organization_id=eq.${c.org}&select=*`);
+  if(!rows[0]||rows[0].owner_id!==c.organization.owner_id)throw fail(409,'Chủ sở hữu cần kết nối kho Drive doanh nghiệp.');
+  const tokenData=await refresh(unseal(rows[0].encrypted_refresh_token,key,c.org));
+  const token=tokenData.access_token;
+  const ttl=Math.min((tokenData.expires_in||3600)-300,3000)*1000;
+  driveTokenCache.set(c.org,{token,expiresAt:Date.now()+Math.max(ttl,60000)});
+  return token;
+ }
  async function document(c,id,action){
   if(!/^[a-zA-Z0-9_-]{1,100}$/.test(id||''))throw fail(400,'Tệp không hợp lệ.');
   const rows=await db(`documents_index?organization_id=eq.${c.org}&doc_uid=eq.${id}&select=*`);
@@ -144,6 +160,7 @@ function createApi(env=process.env,fetcher=fetch,logger=console){
     const response=await fetcher(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(doc.google_drive_file_id)}?alt=media`,{headers:{Authorization:`Bearer ${token}`,...(range?{Range:range}:{})},signal:AbortSignal.timeout(120000)});
     if(!response.ok)throw fail(response.status===404?404:502,'Không đọc được tệp từ kho doanh nghiệp.');
     res.statusCode=response.status;for(const h of ['content-type','content-length','content-range','accept-ranges'])if(response.headers.get(h))res.setHeader(h,response.headers.get(h));
+    res.setHeader('Cache-Control','private, max-age=86400, stale-while-revalidate=604800');
     res.setHeader('Content-Disposition','attachment');if(req.method==='HEAD'){response.body?.cancel();res.end();return;}await pipeline(Readable.fromWeb(response.body),res);return;
    }else{throw fail(404,'Chức năng chưa được cung cấp.');}
    res.setHeader('Content-Type','application/json; charset=utf-8');res.end(JSON.stringify(result));

@@ -2294,8 +2294,19 @@ window.DocHubMedia={init,open,typeOf,getSession:()=>session};
   }
 
   function stateStorageKey() {
-    const accountId=window.DocHubAPI?.user?.id;
-    return accountId?`${STORAGE_KEY_BASE}.${accountId}.${window.DocHubAPI?.organization?.id||'personal'}`:`${STORAGE_KEY_BASE}.guest`;
+    let accountId=window.DocHubAPI?.user?.id;
+    let orgId=window.DocHubAPI?.organization?.id;
+    if(!accountId && typeof localStorage!=='undefined'){
+      try{
+        const authKey=Object.keys(localStorage).find(k=>k.startsWith('sb-')&&k.endsWith('-auth-token'));
+        if(authKey){
+          const parsed=JSON.parse(localStorage.getItem(authKey)||'{}');
+          accountId=parsed?.user?.id;
+          if(accountId){orgId=localStorage.getItem(`dochub.organization.${accountId}`)||'personal';}
+        }
+      }catch(_){}
+    }
+    return accountId?`${STORAGE_KEY_BASE}.${accountId}.${orgId||'personal'}`:`${STORAGE_KEY_BASE}.guest`;
   }
 
   let storageWarning = '';
@@ -2611,10 +2622,22 @@ window.DocHubMedia={init,open,typeOf,getSession:()=>session};
       <td class="action-cell"><button class="icon-btn" data-action="item-menu" data-id="${e(item.id)}" aria-label="Thao tác với ${e(item.name)}" title="Thao tác">${icon('more')}</button></td>
     </tr>`;
   }
+  const thumbUrlCache=new Map();
+  function setCachedThumbUrl(id,url){
+    if(thumbUrlCache.size>100){
+      const oldest=thumbUrlCache.keys().next().value;
+      const oldUrl=thumbUrlCache.get(oldest);
+      if(oldUrl)try{URL.revokeObjectURL(oldUrl);}catch(_){}
+      thumbUrlCache.delete(oldest);
+    }
+    thumbUrlCache.set(id,url);
+  }
   function renderCard(item) {
     const kind=item.kind==='folder'?'folder':window.DocHubMedia.typeOf(item);
-    const cover=kind==='image'&&item.demoKey?`<img src="data:${e(item.mime)};base64,${window.DocHubSamples.assets[item.demoKey]}" alt="">`:
-      kind==='image'?`<img data-thumb-id="${e(item.id)}" alt="">`:
+    const demoAsset=window.DocHubSamples?.assets?.[item.demoKey];
+    const cachedThumb=thumbUrlCache.get(item.id);
+    const cover=kind==='image'&&demoAsset?`<img src="data:${e(item.mime)};base64,${demoAsset}" alt="">`:
+      kind==='image'?`<img data-thumb-id="${e(item.id)}" ${cachedThumb?`src="${cachedThumb}"`:''} alt="">`:
       kind==='video'?`<span class="cover-play">${icon('play')}</span><span class="cover-label">VIDEO LIBRARY</span>`:
       kind==='sheet'?`<span class="cover-grid">${'<i></i>'.repeat(20)}</span><span class="cover-label">SPREADSHEET</span>`:
       ['word','pdf','text'].includes(kind)?`<span class="cover-paper"><strong>${e(item.name.slice(0,35))}</strong><i></i><i></i><i></i><i></i></span><span class="cover-label">${e(item.ext.toUpperCase())}</span>`:icon(kind==='folder'?'folder-open':kind==='audio'?'audio':'file');
@@ -2626,18 +2649,25 @@ window.DocHubMedia={init,open,typeOf,getSession:()=>session};
       <div class="file-card-bottom"><div class="owner-wrap">${avatar(user(item.ownerId),true)}<span>${e(user(item.ownerId)?.name||'')}</span></div><span>${date(item.updatedAt)}</span></div>
     </article>`;
   }
-  let thumbnailGeneration=0,thumbnailUrls=[],thumbnailObserver=null,thumbnailActive=0,thumbnailQueue=[];
+  let thumbnailGeneration=0,thumbnailObserver=null,thumbnailActive=0,thumbnailQueue=[];
   function drainThumbnails(){
-    while(thumbnailActive<3&&thumbnailQueue.length){
+    while(thumbnailActive<6&&thumbnailQueue.length){
       const {img,gen}=thumbnailQueue.shift();
       if(gen!==thumbnailGeneration||!img.isConnected)continue;
+      const id=img.dataset.thumbId;
+      const cached=thumbUrlCache.get(id);
+      if(cached){img.decoding='async';if(img.src!==cached)img.src=cached;continue;}
       thumbnailActive++;
       (async()=>{
         try{
-          const blob=await getAsset(img.dataset.thumbId);
+          const blob=await getAsset(id);
           if(gen!==thumbnailGeneration||!img.isConnected)return;
-          if(blob){const url=URL.createObjectURL(blob);thumbnailUrls.push(url);img.decoding='async';img.src=url;}
-          else img.hidden=true;
+          if(blob){
+            const url=URL.createObjectURL(blob);
+            setCachedThumbUrl(id,url);
+            img.decoding='async';
+            img.src=url;
+          }else img.hidden=true;
         }catch{
           if(gen===thumbnailGeneration&&img.isConnected){img.hidden=true;img.parentElement.title='Chưa tải được ảnh xem trước. Bấm để mở tài liệu.';}
         }finally{thumbnailActive--;drainThumbnails();}
@@ -2647,15 +2677,20 @@ window.DocHubMedia={init,open,typeOf,getSession:()=>session};
   function renderThumbnails() {
     const gen=++thumbnailGeneration;
     thumbnailObserver?.disconnect();thumbnailQueue=[];
-    thumbnailUrls.forEach(URL.revokeObjectURL);thumbnailUrls=[];
     const images=$$('[data-thumb-id]');
+    for(const img of images){
+      const id=img.dataset.thumbId;
+      const cached=thumbUrlCache.get(id);
+      if(cached){img.decoding='async';if(img.src!==cached)img.src=cached;}
+    }
+    const unrendered=images.filter(img=>!img.src);
     const enqueue=img=>{thumbnailQueue.push({img,gen});drainThumbnails();};
-    if(!('IntersectionObserver' in window)){images.forEach(enqueue);return;}
+    if(!('IntersectionObserver' in window)){unrendered.forEach(enqueue);return;}
     thumbnailObserver=new IntersectionObserver(entries=>{
       if(gen!==thumbnailGeneration)return;
       for(const entry of entries)if(entry.isIntersecting){thumbnailObserver.unobserve(entry.target);enqueue(entry.target);}
-    },{rootMargin:'160px'});
-    images.forEach(img=>thumbnailObserver.observe(img));
+    },{rootMargin:'200px'});
+    unrendered.forEach(img=>thumbnailObserver.observe(img));
   }
   // 2.1 PHONE BRIDGE: desktop always uses its existing preference.
   const phoneQuery='(max-width:700px), (max-width:1000px) and (max-height:500px) and (pointer:coarse)';
@@ -3778,10 +3813,17 @@ function openHelp() {
         const serverState = await window.DocHubAPI.loadState();
         const account = window.DocHubAPI?.connected ? window.DocHubAPI.user : null;
         if(account && serverState && validState(serverState)) {
-          state = serverState;
-          upgradeSamples();
-          syncNavigation();
-          renderAll();
+          const currentDocs = JSON.stringify(state.documents);
+          const newDocs = JSON.stringify(serverState.documents);
+          const currentFolders = JSON.stringify(state.folders);
+          const newFolders = JSON.stringify(serverState.folders);
+          if (currentDocs !== newDocs || currentFolders !== newFolders) {
+            state = serverState;
+            upgradeSamples();
+            syncNavigation();
+            renderAll();
+            try { localStorage.setItem(stateStorageKey(), JSON.stringify(state)); } catch(_) {}
+          }
         }
       } catch(error) {
         console.warn('DocHub cloud background sync:', error);

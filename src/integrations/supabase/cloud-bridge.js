@@ -434,8 +434,18 @@
 
     workspaceLoadStatus = 'loading';
     if(organizationBackend){
-      try{const result=await (await backend('workspace')).json();loadedSharedState=result.state;revision=result.revision||1;workspaceLoadStatus=result.state?'loaded':'not_found';return result.state;}
-      catch(error){workspaceLoadStatus='error';throw error;}
+      try{
+        const result=await (await backend('workspace')).json();
+        loadedSharedState=result.state;
+        revision=result.revision||1;
+        workspaceLoadStatus=result.state?'loaded':'not_found';
+        if(result.state) await cacheSet('meta', userCacheKey('workspace_state'), { state: result.state, revision });
+        return result.state;
+      }catch(error){
+        const cached=await cacheGet('meta', userCacheKey('workspace_state'));
+        if(cached?.state){loadedSharedState=cached.state;revision=cached.revision||1;workspaceLoadStatus='loaded';return cached.state;}
+        workspaceLoadStatus='error';throw error;
+      }
     }
     try {
       const { data, error } = await supabase
@@ -445,6 +455,8 @@
         .maybeSingle();
 
       if (error) {
+        const cached=await cacheGet('meta', userCacheKey('workspace_state'));
+        if(cached?.state){workspaceLoadStatus='loaded';revision=cached.revision||1;return cached.state;}
         workspaceLoadStatus = 'error';
         console.warn('Lỗi đọc dữ liệu từ Supabase:', error);
         return null;
@@ -454,6 +466,7 @@
         driveSharingEnabled = data.state.preferences?.driveSharingEnabled === true;
         workspaceLoadStatus = 'loaded';
         revision = data.revision || 1;
+        await cacheSet('meta', userCacheKey('workspace_state'), { state: data.state, revision });
         console.log(`DocHub: Đã tải không gian làm việc từ Supabase (Revision ${revision})`);
         return data.state;
       }
@@ -462,6 +475,8 @@
       workspaceLoadStatus = 'not_found';
       return null;
     } catch (err) {
+      const cached=await cacheGet('meta', userCacheKey('workspace_state'));
+      if(cached?.state){workspaceLoadStatus='loaded';revision=cached.revision||1;return cached.state;}
       workspaceLoadStatus = 'error';
       console.error('DocHub loadState failed:', err);
       return null;
@@ -684,14 +699,19 @@
   };
   api.getAsset = async (id, parentFolderId = 'all') => {
     await api.ready;
-    // The organization endpoint checks membership and the document's real folder
-    // on every request. Avoid a duplicate RPC using the caller's folder hint.
-    if(organizationBackend)return (await backend('asset&id='+encodeURIComponent(id))).blob();
-    await api.requirePermission(parentFolderId, 'read');
-    // 1. Kiểm tra cache IndexedDB
+    // 1. Kiểm tra L1 cache IndexedDB cục bộ của người dùng (0ms load time)
     const cached = await cacheGet('assets', userCacheKey(id));
     if (cached) return cached;
 
+    // The organization endpoint checks membership and the document's real folder
+    // on every request. Avoid a duplicate RPC using the caller's folder hint.
+    if(organizationBackend){
+      const res = await backend('asset&id='+encodeURIComponent(id));
+      const blob = await res.blob();
+      if(blob) await cacheSet('assets', userCacheKey(id), blob);
+      return blob;
+    }
+    await api.requirePermission(parentFolderId, 'read');
     // 2. Nếu không có trong cache, tải từ Google Drive
     if (providerToken && window.DocHubDrive) {
       const meta = await getDriveMeta(id);
@@ -749,7 +769,12 @@
    */
   api.removeAsset = async (id, parentFolderId = 'all') => {
     await api.requirePermission(parentFolderId, 'delete');
-    if(organizationBackend){await backend('document-update',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id,trash:true})});return;}
+    if(organizationBackend){
+      await backend('document-update',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id,trash:true})});
+      await cacheDelete('assets', userCacheKey(id));
+      await cacheDelete('meta', userCacheKey(id));
+      return;
+    }
     await cacheDelete('assets', userCacheKey(id));
     if (providerToken && window.DocHubDrive) {
       const meta = await cacheGet('meta', userCacheKey(id));
