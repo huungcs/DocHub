@@ -444,12 +444,21 @@
   /**
    * Lưu trữ tệp tài liệu: Đẩy lên Google Drive của khách hàng và lưu cache cục bộ
    */
-  api.putAsset = async (id, blob, parentFolderId = 'all') => {
+  api.putAsset = async (id, blob, parentFolderId = 'all', options = {}) => {
+    const { onProgress, signal } = options;
     await api.requirePermission(parentFolderId, 'create');
+    if (signal?.aborted) {
+      const error = new Error('Đã hủy tải tệp lên.');
+      error.name = 'AbortError';
+      throw error;
+    }
     // 1. Luôn lưu cache cục bộ để xem trước tức thì
+    onProgress?.({ phase: 'caching', loaded: 0, total: blob.size, percent: 0 });
     await cacheSet('assets', userCacheKey(id), blob);
+    onProgress?.({ phase: 'connecting', loaded: 0, total: blob.size, percent: 0 });
 
     // 2. Nếu có kết nối Google Drive, tải lên Drive của khách
+    let driveStored = false;
     if (providerToken && googleDriveFolderId && window.DocHubDrive) {
       try {
         const fileMeta = await window.DocHubDrive.uploadFile(
@@ -457,8 +466,10 @@
           googleDriveFolderId,
           blob,
           id,
-          blob.type || 'application/octet-stream'
+          blob.type || 'application/octet-stream',
+          { onProgress, signal }
         );
+        driveStored = true;
         // Lưu ánh xạ ID nội bộ -> Google Drive File ID
         await cacheSet('meta', userCacheKey(id), { driveId: fileMeta.id, webViewLink: fileMeta.webViewLink });
 
@@ -478,9 +489,19 @@
           }, { onConflict: 'user_id,doc_uid' });
         }
       } catch (driveErr) {
+        if (driveErr?.name === 'AbortError') {
+          await cacheDelete('assets', userCacheKey(id));
+          throw driveErr;
+        }
         console.warn('Lỗi tải tệp lên Google Drive:', driveErr);
+        onProgress?.({ phase: 'local', loaded: blob.size, total: blob.size, percent: 100, error: driveErr.message });
       }
     }
+    if (!driveStored && (!providerToken || !googleDriveFolderId || !window.DocHubDrive)) {
+      const reason = !providerToken ? 'Chưa kết nối Google Drive. Đăng nhập lại Google để cấp quyền Drive.' : authError || 'Không kết nối được thư mục Drive. Vui lòng kết nối lại Google Drive.';
+      onProgress?.({ phase: 'local', loaded: blob.size, total: blob.size, percent: 100, error: reason });
+    }
+    return { driveStored, cached: true };
   };
 
   /**

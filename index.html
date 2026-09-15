@@ -6,6 +6,7 @@
   <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
   <script>if(window.pdfjsLib)window.pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js';</script>
   <script src="./assets/client-config.js"></script>
+  <script src="./assets/search-engine.js"></script>
   <script src="./assets/google-drive-client.js"></script>
   <script src="./assets/supabase-cloud-bridge.js"></script>
 
@@ -161,13 +162,14 @@ svg.icon.tiny{width:15px;height:15px}
 .tree-group .tree-group{position:relative}
 .tree-group .tree-group::before{content:"";position:absolute;left:calc(18px + var(--parent-level,0)*18px);top:3px;bottom:11px;border-left:1px solid var(--line)}
 .tree-empty{padding:25px 12px;color:var(--muted);font-size:12px;text-align:center}
-.sidebar-bottom{padding:13px 18px 15px;flex-shrink:0;border-top:1px solid var(--line)}
+.sidebar-bottom{padding:9px 16px;flex-shrink:0;border-top:1px solid var(--line)}
 .settings-launch{display:flex;align-items:center;gap:10px;border-radius:8px;width:100%;padding:11px 10px;text-align:left;font-size:12px;font-weight:550}
 .settings-launch:hover{background:var(--surface-hover)}
 .settings-launch>.icon{color:var(--muted);width:19px;height:19px}
 .settings-caption{margin-left:auto;font-size:9px;color:var(--subtle);font-weight:400}
-.sidebar-footnote{display:flex;justify-content:space-between;margin-top:16px;padding:0 9px;font-size:9px;color:var(--subtle)}
-.sidebar-footnote .text-button{color:var(--muted);font-size:9px;font-weight:400}
+.sidebar-footnote{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:0;padding:0 2px;font-size:10px;color:var(--subtle);line-height:1}
+.sidebar-footnote .text-button{display:inline-flex;align-items:center;gap:3px;color:var(--muted);font-size:10px;font-weight:400;padding:2px 6px;border-radius:4px;min-height:unset;height:auto}
+.sidebar-footnote .text-button:hover{color:var(--ink);background:var(--surface-soft)}
 .main-shell{min-width:0;display:flex;flex-direction:column}
 .topbar{height:82px;border-bottom:1px solid var(--line);background:var(--surface);display:flex;align-items:center;padding:0 32px;gap:12px;position:sticky;top:0;z-index:10}
 .global-search{position:relative;display:flex;align-items:center;width:min(490px,46vw)}
@@ -502,10 +504,41 @@ dialog[open]{animation:dialog-in .17s ease-out}
 .toast>.icon{color:var(--green);width:19px;height:19px}
 .toast.warning>.icon{color:var(--amber)}
 .toast.error>.icon{color:var(--red)}
-.toast span{flex:1;line-height:1.7}
+.toast span{flex:1;min-width:0;line-height:1.7;overflow-wrap:anywhere;color:var(--ink)}
+.toast{color:var(--ink)}
+.search-filters{border-bottom:1px solid var(--line);background:var(--surface)}
+.search-filters>summary{list-style:none;display:flex;align-items:center;gap:9px;min-height:52px;padding:12px 20px;cursor:pointer;font-size:12px;font-weight:650;color:var(--text)}
+.search-filters>summary::-webkit-details-marker{display:none}
+.search-filters>summary:hover{background:var(--surface-soft)}
+.search-filters>summary>.icon:first-child{width:17px;height:17px;color:var(--brand)}
+.search-filter-count{background:var(--brand-soft);color:var(--brand-ink);padding:2px 7px;border-radius:6px;font-size:10px}
+.search-filter-chevron{margin-left:auto;transition:transform .15s}
+.search-filters[open] .search-filter-chevron{transform:rotate(180deg)}
+.search-filter-body{padding:4px 20px 18px}
+.search-filter-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px 16px}
+.search-filter-field{display:grid;align-content:start;gap:7px;min-width:0;border:0;padding:0;margin:0}
+.search-filter-label,.search-filter-field>legend{font-size:11px;font-weight:600;color:var(--muted);padding:0;margin-bottom:0}
+.search-filter-field>legend{margin-bottom:7px}
+.search-filter-field input:not([type=checkbox]),.search-filter-field select{width:100%;height:42px;border-radius:9px;font-size:12px;background:var(--surface-soft)}
+.search-filter-range{display:grid;grid-template-columns:minmax(0,1fr) 12px minmax(0,1fr);align-items:center;gap:6px;min-width:0}
+.search-filter-range>span{text-align:center;color:var(--subtle)}
+.search-filter-range label{min-width:0}
+.search-filter-range input{padding-inline:8px!important}
+.search-filter-pin{display:flex;gap:10px;align-items:center;min-height:42px;padding:9px 12px;border:1px solid var(--line-strong);border-radius:9px;background:var(--surface-soft);cursor:pointer;font-size:12px;color:var(--text)}
+.search-filter-pin:has(input:checked){border-color:var(--brand);background:var(--brand-soft);color:var(--brand-ink)}
+.search-filter-pin .icon{width:16px;height:16px}
+.search-filter-footer{display:flex;justify-content:space-between;align-items:center;gap:16px;margin-top:18px;padding-top:14px;border-top:1px solid var(--line)}
+.search-filter-hint{font-size:11px;color:var(--muted);line-height:1.7;max-width:520px}
+.search-filter-actions{display:flex;gap:8px;flex-wrap:wrap;flex-shrink:0}
+@media(max-width:1200px){.search-filter-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.search-filter-footer{align-items:flex-start;flex-direction:column}}
+@media(max-width:700px){.search-filters>summary{padding:12px 14px;min-height:48px}.search-filter-body{padding:4px 14px 16px}.search-filter-grid{grid-template-columns:minmax(0,1fr);gap:14px}.search-filter-field input:not([type=checkbox]),.search-filter-field select{min-height:46px;height:46px;font-size:16px}.search-filter-label,.search-filter-field>legend{font-size:12px}.search-filter-pin{min-height:46px;font-size:13px}.search-filter-actions{width:100%;display:grid;grid-template-columns:1fr 1fr}.search-filter-actions .btn{min-height:44px;padding:9px 8px;font-size:12px;white-space:normal}.search-filter-actions .search-filter-restore{grid-column:1/-1}}
 .toast .text-button{white-space:nowrap;font-size:11px}
 .toast .icon-btn{width:24px;height:26px}
 .toast .icon-btn .icon{width:14px;height:14px}
+.upload-center{position:fixed;right:26px;bottom:25px;z-index:109;width:min(390px,calc(100vw - 30px));background:var(--surface);border:1px solid var(--line);border-radius:16px;box-shadow:var(--dialog-shadow);overflow:hidden;animation:dialog-in .2s ease-out}
+.upload-center[hidden]{display:none}.upload-center-head{height:54px;padding:0 16px;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--line)}.upload-center-head>.icon{width:19px;height:19px;color:var(--brand)}.upload-center-head strong{font-size:13px;flex:1}.upload-center-head small{font-size:10px;color:var(--muted)}
+.upload-list{max-height:310px;overflow:auto;padding:5px}.upload-job{padding:11px 10px;border-radius:11px;display:grid;grid-template-columns:36px minmax(0,1fr) 30px;gap:9px;align-items:center}.upload-job+.upload-job{border-top:1px solid var(--line);border-radius:0}.upload-job-icon{width:34px;height:34px;border-radius:9px;background:var(--brand-soft);color:var(--brand);display:grid;place-items:center}.upload-job-icon>.icon{width:17px;height:17px}.upload-job-main{min-width:0}.upload-job-name{font-size:11px;font-weight:650;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.upload-job-meta{display:flex;justify-content:space-between;gap:10px;margin-top:4px;color:var(--muted);font-size:9px}.upload-progress{height:4px;margin-top:7px;border-radius:999px;background:var(--surface-soft);overflow:hidden}.upload-progress>span{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--brand),#6f91f8);border-radius:inherit;transition:width .18s ease}.upload-job.complete .upload-progress>span{background:var(--green)}.upload-job.error .upload-progress>span{background:var(--red)}.upload-job.local .upload-progress>span{background:var(--amber)}.upload-job-action{width:30px;height:30px}.upload-job-action>.icon{width:15px;height:15px}.upload-job.complete .upload-job-icon{background:#e9f6f0;color:var(--green)}.upload-job.error .upload-job-icon{background:#fff0f1;color:var(--red)}.upload-job.local .upload-job-icon{background:#fff7e7;color:var(--amber)}
+body.has-uploads .toast-stack{bottom:415px}
 .shortcut-list{margin-top:20px}
 .shortcut-list>div{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--line);font-size:12px}
 .shortcut-list kbd{padding:3px 7px;border:1px solid var(--line-strong);background:var(--surface-soft);border-radius:5px;color:var(--muted);font:10px var(--font)}
@@ -601,6 +634,11 @@ dialog[open]{animation:dialog-in .17s ease-out}
   .toast-stack{right:15px;bottom:max(20px,env(safe-area-inset-bottom));width:calc(100vw - 30px)}
   body.has-selection .toast-stack{bottom:80px}
   .toast{font-size:11px;padding:12px}
+  .upload-center{left:12px;right:12px;bottom:calc(var(--m-dock,76px) + env(safe-area-inset-bottom,0px) + 10px);width:auto;border-radius:16px}
+  body.m-modal-open .upload-center{bottom:calc(12px + env(safe-area-inset-bottom,0px))}
+  .upload-list{max-height:min(42dvh,310px)}
+  .upload-center-head{height:50px}.upload-job{padding:10px 8px}.upload-job-name{font-size:12px}.upload-job-meta{font-size:10px}
+  body.has-uploads .toast-stack{bottom:calc(var(--m-dock,76px) + env(safe-area-inset-bottom,0px) + min(42dvh,310px) + 72px)}
   dialog{max-width:calc(100vw - 24px);max-height:calc(100dvh - 24px);border-radius:13px}
   .form-dialog{width:calc(100vw - 24px)}
   .dialog-heading{padding:18px}
@@ -731,7 +769,7 @@ dialog[open]{animation:dialog-in .17s ease-out}
   <style>
 /* Studio design system: touch-first controls, local overflow, accessible contrast. */
 :root{--studio-navy:#101c32;--studio-blue:#3269ed;--studio-paper:#fff}
-.sidebar-footnote{margin-top:10px}.settings-launch{display:none!important}
+.sidebar-footnote{margin-top:0}.settings-launch{display:none!important}
 .file-card{overflow:hidden;padding:0;transition:box-shadow .18s,transform .18s}.file-card:hover{box-shadow:0 10px 28px -12px #20385835;transform:translateY(-2px)}
 .file-card .file-card-top{padding:14px 18px;margin:0;min-height:56px}.file-card .doc-title-line{padding:14px 18px 4px}.file-card>.doc-subline{padding:0 18px 14px;display:block}.file-card .file-card-bottom{margin:0 18px;padding:13px 0}
 .file-cover{height:148px;display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden;width:100%;border-bottom:1px solid var(--line);background:#f3f6fb;color:var(--brand)}
@@ -964,11 +1002,12 @@ input[type="checkbox"]:disabled {opacity:.45;cursor:not-allowed}
   .nav-dialog .tree-toggle>.icon {width:15px;height:15px}
   .nav-dialog .tree-node .folder-mini {width:20px;height:20px;margin-right:5px}
   .nav-dialog .tree-group .tree-group::before {left:calc(23px + var(--parent-level,0)*16px)}
-  .nav-dialog .sidebar-bottom {padding:10px 18px calc(12px + env(safe-area-inset-bottom,0px))}
+  .nav-dialog .sidebar-bottom {padding:8px 16px calc(8px + env(safe-area-inset-bottom,0px))}
   .nav-dialog .local-note {padding-bottom:8px}
   .nav-dialog .local-note strong {font-size:12px}
   .nav-dialog .local-note small {font-size:11px}
-  .nav-dialog .sidebar-footnote .text-button {min-height:44px}
+  .nav-dialog .sidebar-footnote {margin-top:0;display:flex;align-items:center;justify-content:space-between}
+  .nav-dialog .sidebar-footnote .text-button {min-height:28px;height:28px;display:inline-flex;align-items:center;padding:2px 6px}
   .menu-dialog {left:0!important;right:0!important;top:auto!important;bottom:var(--m-keyboard-offset,0px)!important;width:100%!important;max-width:100%;margin:0;padding:24px 14px calc(18px + env(safe-area-inset-bottom,0px));border:0;border-top:1px solid var(--line);border-radius:24px 24px 0 0;max-height:calc(var(--m-vh,100dvh) - 24px);overflow-y:auto;overscroll-behavior:contain;box-shadow:0 -18px 70px #101c3240}
   .menu-dialog::before {content:"";display:block;position:absolute;left:calc(50% - 18px);top:9px;width:36px;height:4px;border-radius:5px;background:var(--line-strong)}
   .menu-dialog::backdrop {background:#0e1c365e;backdrop-filter:blur(3px)}
@@ -1550,6 +1589,10 @@ body.auth-locked{overflow:hidden}
   </div>
 </div>
 <div id="selectionBar" class="selection-bar" hidden></div>
+<section id="uploadCenter" class="upload-center" aria-label="Tiến trình tải tệp" hidden>
+  <header class="upload-center-head"><svg class="icon" aria-hidden="true"><use href="#i-upload"/></svg><strong>Đang tải lên</strong><small id="uploadSummary"></small><button class="icon-btn" data-action="close-uploads" aria-label="Thu nhỏ tiến trình"><svg class="icon" aria-hidden="true"><use href="#i-close"/></svg></button></header>
+  <div id="uploadList" class="upload-list" aria-live="polite"></div>
+</section>
 <div id="toasts" class="toast-stack" aria-live="polite" aria-atomic="false"></div>
 <input id="fileInput" class="visually-hidden" type="file" multiple aria-label="Chọn tài liệu từ thiết bị">
 <dialog id="navDialog" class="nav-dialog" aria-label="Cây thư mục"></dialog>
@@ -2097,7 +2140,7 @@ window.DocHubMedia={init,open,typeOf,getSession:()=>session};
   const ui={
     folder:state.preferences.lastFolder || 'salary',
     expanded:new Set(state.preferences.expanded || ['admin']),
-    tab:'all',query:'',localQuery:'',treeQuery:'',page:1,selected:new Set(),
+    tab:'all',query:'',localQuery:'',treeQuery:'',page:1,selected:new Set(),filters:{},filtersOpen:false,
     settings:'permissions',settingsQuery:'',permissionFolder:'salary',inspectUser:'u2',
     previewId:null,previewTab:'preview',previewUrls:[],uploading:false
   };
@@ -2200,12 +2243,13 @@ window.DocHubMedia={init,open,typeOf,getSession:()=>session};
     if(!window.DocHubAPI?.connected || !window.DocHubAPI?.requirePermission)return true;
     return window.DocHubAPI.requirePermission(folderId,action);
   }
-  async function saveAsset(id,file,parentFolderId='all') {
+  async function saveAsset(id,file,parentFolderId='all',options={}) {
     if(window.DocHubAPI?.connected) {
       if(DocHubAPI.conflict)throw new Error('Dữ liệu đã thay đổi ở nơi khác. Tải lại trước khi lưu.');
-      try{await DocHubAPI.putAsset(id,file,parentFolderId);return 'server';}
+      try{const result=await DocHubAPI.putAsset(id,file,parentFolderId,options);return result?.driveStored?'server':'device';}
       catch(error){
         if(error?.code==='permission_denied'||/không có quyền/i.test(error?.message||''))throw error;
+        if(error?.name==='AbortError')throw error;
         toast('Chưa lưu được lên máy chủ. Đang thử lưu trên trình duyệt này.','warning');
       }
     }
@@ -2289,15 +2333,22 @@ window.DocHubMedia={init,open,typeOf,getSession:()=>session};
 
   function scopedItems() {
     let result=allItems();
-    if(ui.query) {
-      const q=normalize(ui.query);
-      result=result.filter(item=>normalize(`${item.name} ${item.description||''}`).includes(q));
-    } else result=result.filter(item=>item.parentId===ui.folder);
-    if(ui.localQuery) {
-      const q=normalize(ui.localQuery);
-      result=result.filter(item=>normalize(`${item.name} ${item.description||''}`).includes(q));
+    if(!ui.query && ui.filters.scope!=='all') {
+      const parents=new Set(ui.filters.scope==='descendants'?descendantIds(ui.folder):[ui.folder]);
+      result=result.filter(item=>parents.has(item.parentId));
     }
+    const query=[ui.query,ui.localQuery].filter(Boolean).join(' ');
+    result=result.filter(item=>window.DocHubSearch?DocHubSearch.match(item,query,ui.filters):normalize(`${item.name} ${item.description||''}`).includes(normalize(query)));
     return result;
+  }
+  function advancedFilters() {
+    const f=ui.filters, count=Object.values(f).filter(Boolean).length;
+    const options=(values,current)=>values.map(([value,label])=>`<option value="${e(value)}" ${current===value?'selected':''}>${e(label)}</option>`).join('');
+    const field=(key,label,body)=>`<label class="search-filter-field"><span class="search-filter-label">${label}</span>${body}</label>`;
+    const select=(key,label,values)=>field(key,label,`<select data-search-filter="${key}">${options(values,f[key]||'')}</select>`);
+    const input=(key,label,type)=>`<label><span class="visually-hidden">${label}</span><input data-search-filter="${key}" type="${type}" value="${e(f[key]||'')}" ${type==='number'?`min="0" step="0.1" placeholder="${key==='min'?'Từ':'Đến'}" inputmode="decimal"`:''}></label>`;
+    const extensions=[...new Set(state.documents.filter(active).map(d=>d.ext).filter(Boolean))].sort();
+    return `<details id="advancedSearch" class="search-filters" ${ui.filtersOpen?'open':''}><summary>${icon('sort')}<span>Bộ lọc nâng cao</span>${count?`<span class="search-filter-count">${count} điều kiện</span>`:''}${icon('down','tiny search-filter-chevron')}</summary><div class="search-filter-body"><div class="search-filter-grid">${select('scope','Phạm vi tìm kiếm', [['','Thư mục hiện tại'],['descendants','Gồm thư mục con'],['all','Toàn không gian đã tải']])}${select('ext','Định dạng tài liệu',[['','Tất cả định dạng'],...extensions.map(ext=>[ext,ext.toUpperCase()])])}${select('owner','Người tạo',[['','Tất cả người tạo'],...state.users.map(u=>[u.id,u.name])])}<fieldset class="search-filter-field"><legend>Khoảng cập nhật</legend><div class="search-filter-range">${input('from','Cập nhật từ','date')}<span aria-hidden="true">–</span>${input('to','Cập nhật đến','date')}</div></fieldset><fieldset class="search-filter-field"><legend>Dung lượng · MB</legend><div class="search-filter-range">${input('min','Dung lượng tối thiểu (MB)','number')}<span aria-hidden="true">–</span>${input('max','Dung lượng tối đa (MB)','number')}</div></fieldset><div class="search-filter-field"><span class="search-filter-label">Trạng thái</span><label class="search-filter-pin"><input type="checkbox" data-search-filter="pinned" ${f.pinned?'checked':''}>${icon('pin')}<span>Chỉ mục đã ghim</span></label></div></div><div class="search-filter-footer"><p class="search-filter-hint">Tìm tên và mô tả · <strong>"cụm từ"</strong> để tìm liền nhau, <strong>-từ</strong> để loại trừ. Chưa tìm nội dung PDF/Office; chỉ tìm dữ liệu đã tải.</p><div class="search-filter-actions"><button class="btn sm ghost" data-action="reset-filters">Xóa bộ lọc</button><button class="btn sm" data-action="save-filters">${icon('check','tiny')}Lưu bộ lọc</button>${state.preferences.savedSearchFilter?'<button class="btn sm search-filter-restore" data-action="restore-filters">Áp dụng bộ lọc đã lưu</button>':''}</div></div></div></details>`;
   }
   function visibleItems() {
     let items=scopedItems();
@@ -2424,14 +2475,15 @@ window.DocHubMedia={init,open,typeOf,getSession:()=>session};
       ui.page=Math.min(ui.page,totalPages);
       const pageItems=items.slice((ui.page-1)*PAGE_SIZE,ui.page*PAGE_SIZE);
       const tabs=[['all','Tất cả',all.length],['files','Tài liệu',all.filter(i=>i.kind==='file').length],['folders','Thư mục',all.filter(i=>i.kind==='folder').length],['starred','Đã ghim',all.filter(i=>i.starred).length]];
-      const table=pageItems.length?(currentPresentationView()==='grid'?`<div class="document-grid">${pageItems.map(renderCard).join('')}</div>`:
+      const table=!pageItems.length&&Object.values(ui.filters).some(Boolean)?`<div class="empty-state"><span class="empty-symbol">${icon('search')}</span><h3>Không có mục phù hợp bộ lọc</h3><p>Thử mở rộng khoảng ngày, dung lượng hoặc xóa điều kiện lọc.</p><button class="btn" data-action="reset-filters">${icon('close')}Xóa bộ lọc</button></div>`:pageItems.length?(currentPresentationView()==='grid'?`<div class="document-grid">${pageItems.map(renderCard).join('')}</div>`:
         `<table class="document-table"><thead><tr><th class="select-cell"><label><input id="selectAll" type="checkbox" aria-label="Chọn tất cả mục trên trang" ${pageItems.every(item=>ui.selected.has(item.id))?'checked':''}></label></th><th class="name-cell" scope="col">Tên tài liệu ${state.preferences.sort==='name'?icon('down','tiny'):''}</th><th class="owner-cell" scope="col">Người tạo</th><th class="date-cell" scope="col">Cập nhật ${state.preferences.sort==='updated'?icon('down','tiny'):''}</th><th class="size-cell" scope="col">Dung lượng</th><th class="action-cell" scope="col"><span class="visually-hidden">Thao tác</span></th></tr></thead><tbody>${pageItems.map(renderRow).join('')}</tbody></table>`):
         `<div class="empty-state"><span class="empty-symbol">${icon(ui.query||ui.localQuery?'search':ui.tab==='starred'?'star':'folder-open')}</span><h3>${ui.query||ui.localQuery?'Chưa tìm thấy kết quả':ui.tab==='starred'?'Chưa có tài liệu được ghim':'Thư mục đang chờ tài liệu'}</h3><p>${ui.query||ui.localQuery?'Thử một từ khóa khác hoặc bỏ bộ lọc để xem thêm.':ui.tab==='starred'?'Mở menu ba chấm của một mục và chọn Ghim để tìm lại nhanh hơn.':'Tải tài liệu đầu tiên hoặc tạo một thư mục để bắt đầu sắp xếp.'}</p><button class="btn ${ui.query||ui.localQuery?'':'primary'}" data-action="${ui.query||ui.localQuery?'clear-search':'upload'}">${icon(ui.query||ui.localQuery?'close':'upload')}${ui.query||ui.localQuery?'Bỏ bộ lọc':'Tải tài liệu lên'}</button></div>`;
       $('#workspace').innerHTML=`
         ${compactFolderHeading(current, all)}
         <section class="content-card" aria-label="Danh sách tài liệu">
           <div class="content-toolbar"><div class="content-tabs" role="tablist" aria-label="Lọc theo loại">${tabs.map(([key,label,count])=>`<button class="tab-button ${ui.tab===key?'active':''}" role="tab" aria-selected="${ui.tab===key}" data-action="tab" data-tab="${key}">${e(label)} <span class="tab-count">${count}</span></button>`).join('')}</div><div class="toolbar-controls"><div class="filter-search">${icon('search')}<input id="localSearch" type="search" value="${e(ui.localQuery)}" placeholder="Lọc trong thư mục..." aria-label="Lọc danh sách hiện tại"></div><button class="icon-btn sort-button" data-action="sort-menu" aria-label="Sắp xếp tài liệu" title="Sắp xếp">${icon('sort')}</button><button class="icon-btn cf-view-toggle" data-action="view" data-view="${currentPresentationView()==='grid'?'list':'grid'}" aria-label="${currentPresentationView()==='grid'?'Chuy\u1ec3n sang danh s\u00e1ch':'Chuy\u1ec3n sang d\u1ea1ng l\u01b0\u1edbi'}" title="${currentPresentationView()==='grid'?'Danh s\u00e1ch':'D\u1ea1ng l\u01b0\u1edbi'}">${icon(currentPresentationView()==='grid'?'list':'grid')}</button><div class="view-switch" role="group" aria-label="Kiểu hiển thị"><button class="${currentPresentationView()==='list'?'active':''}" data-action="view" data-view="list" aria-label="Dạng danh sách" aria-pressed="${currentPresentationView()==='list'}">${icon('list')}</button><button class="${currentPresentationView()==='grid'?'active':''}" data-action="view" data-view="grid" aria-label="Dạng lưới" aria-pressed="${currentPresentationView()==='grid'}">${icon('grid')}</button></div></div></div>
-          ${table}
+          ${advancedFilters()}
+          <span class="visually-hidden" role="status">${items.length} kết quả phù hợp</span>${table}
           <div class="table-footer"><span>${items.length?`${(ui.page-1)*PAGE_SIZE+1}–${Math.min(ui.page*PAGE_SIZE,items.length)} trong ${items.length} mục`:'0 mục'}${ui.selected.size?` · ${ui.selected.size} đã chọn`:''}</span><div class="pagination">${totalPages>1?`<button class="icon-btn page-prev" data-action="page" data-page="${ui.page-1}" ${ui.page===1?'disabled':''} aria-label="Trang trước">${icon('chevron','tiny')}</button><span class="page-number">${ui.page} / ${totalPages}</span><button class="icon-btn" data-action="page" data-page="${ui.page+1}" ${ui.page===totalPages?'disabled':''} aria-label="Trang sau">${icon('chevron','tiny')}</button>`:`<span>${icon('check','tiny')} ${window.DocHubAPI?.connected?'Đồng bộ riêng theo tài khoản':'Lưu trên trình duyệt'}</span>`}</div></div>
         </section>
         <div class="drop-zone" id="dropZone">${icon('upload')}<div>Kéo thả tài liệu vào đây hoặc <button data-action="upload">chọn từ thiết bị</button><small>Mọi định dạng: ảnh, video, PDF, Excel, Word, ZIP... · Tối đa 250 MB/tệp</small></div></div>
@@ -2821,34 +2873,66 @@ window.DocHubMedia={init,open,typeOf,getSession:()=>session};
     if($('#settingsDialog').open)renderSettings();
     toast(item.sample?'Đã tạo bản nội dung mẫu .txt.':'Đã chuẩn bị tệp để tải xuống.');
   }
+  const uploadJobs=new Map();
+  let uploadPanelDismissed=false,uploadHideTimer;
+  const uploadPhaseLabel=job=>({queued:'Đang chờ',caching:'Đang lưu an toàn',connecting:'Đang kết nối Drive',preparing:'Đang chuẩn bị Drive',uploading:`Đang tải ${job.percent||0}%`,retrying:`Mất mạng · thử lại lần ${job.attempt||1}`,complete:'Đã tải lên Drive',local:'Đã lưu trên thiết bị',error:'Tải lên thất bại',cancelled:'Đã hủy'})[job.status]||'Đang xử lý';
+  function transferMeta(job) {
+    if(job.status==='error')return job.error||'Có lỗi xảy ra';
+    if(job.status==='local')return job.error||'Chưa đồng bộ Drive · có thể thử lại';
+    if(job.status==='cancelled')return 'Tệp chưa được thêm';
+    const loaded=Math.min(job.loaded||0,job.total||0),parts=[`${bytes(loaded)} / ${bytes(job.total||0)}`],elapsed=(Date.now()-(job.startedAt||Date.now()))/1000;
+    if(job.status==='uploading'&&loaded>0&&elapsed>0.4){const speed=loaded/elapsed;parts.push(`${bytes(speed)}/giây`);if(job.total>loaded&&speed>0)parts.push(`còn ~${Math.max(1,Math.ceil((job.total-loaded)/speed))} giây`);}
+    return parts.join(' · ');
+  }
+  function renderUploadCenter() {
+    const host=$('#uploadCenter'),list=$('#uploadList');if(!host||!list)return;
+    const jobs=[...uploadJobs.values()],active=jobs.filter(j=>!['complete','local','error','cancelled'].includes(j.status));
+    clearTimeout(uploadHideTimer);
+    if(jobs.length&&!active.length&&!jobs.some(j=>j.running)&&!uploadPanelDismissed&&!jobs.some(j=>j.status==='error')){
+      uploadHideTimer=setTimeout(()=>{for(const [id,job] of uploadJobs)if(!job.running)uploadJobs.delete(id);renderUploadCenter();},jobs.some(j=>j.status==='local')?12000:3500);
+    }
+    host.hidden=!jobs.length||uploadPanelDismissed;
+    document.body.classList.toggle('has-uploads',jobs.length>0&&!uploadPanelDismissed);
+    $('.upload-center-head strong',host).textContent=active.length?'Đang tải lên':jobs.some(j=>j.status==='error')?'Có tệp tải thất bại':jobs.some(j=>j.status==='local')?'Đã lưu máy · chưa lên Drive':'Đã hoàn tất tải lên';
+    $('#uploadSummary').textContent=active.length?`${active.length} đang xử lý`:`${jobs.filter(j=>j.status==='complete').length}/${jobs.length} lên Drive`;
+    list.innerHTML=jobs.map(job=>{const terminal=['complete','local','error','cancelled'].includes(job.status),retryable=['local','error','cancelled'].includes(job.status),action=terminal?(retryable?'retry-upload':'dismiss-upload'):'cancel-upload';return `<article class="upload-job ${e(job.status)}"><span class="upload-job-icon">${icon(job.status==='complete'?'check':job.status==='error'?'info':'upload')}</span><div class="upload-job-main"><div class="upload-job-name" title="${e(job.fileName)}">${e(job.fileName)}</div><div class="upload-job-meta"><span>${e(uploadPhaseLabel(job))}</span><span>${e(transferMeta(job))}</span></div><div class="upload-progress" role="progressbar" aria-label="Tiến trình tải ${e(job.fileName)}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${job.percent||0}"><span style="width:${Math.max(0,Math.min(100,job.percent||0))}%"></span></div></div><button class="icon-btn upload-job-action" data-action="${action}" data-id="${e(job.id)}" aria-label="${action==='cancel-upload'?'Hủy tải':action==='retry-upload'?'Thử đồng bộ lại':'Ẩn'} ${e(job.fileName)}">${icon(action==='retry-upload'?'restore':'close')}</button></article>`;}).join('');
+  }
+  function updateUploadJob(job,progress={}) {job.status=progress.phase||job.status;if(progress.error)job.error=progress.error;job.loaded=Number.isFinite(progress.loaded)?progress.loaded:job.loaded;job.total=Number.isFinite(progress.total)?progress.total:job.total;job.percent=Number.isFinite(progress.percent)?progress.percent:job.percent;job.attempt=progress.attempt||job.attempt;renderUploadCenter();}
+  async function runUploadJob(job) {
+    if(!job?.file||job.running)return false;
+    job.running=true;job.error='';job.startedAt=Date.now();job.controller=new AbortController();updateUploadJob(job,{phase:'queued',loaded:0,percent:0});
+    try {
+      const assetStorage=await saveAsset(job.docId,job.file,job.parentId,{signal:job.controller.signal,onProgress:progress=>updateUploadJob(job,progress)}),now=new Date().toISOString();
+      if(!job.documentAdded){state.documents.push({id:job.docId,parentId:job.parentId,name:job.name,ext:job.ext,bytes:job.file.size,ownerId:'u1',description:'',updatedAt:now,createdAt:now,starred:false,kind:'file',sample:false,source:'upload',assetStorage,mime:job.file.type||mimeFor(job.ext),deletedAt:null});job.documentAdded=true;commit('Tải lên tài liệu',job.parentId,`${job.fileName} · ${assetStorage==='server'?'Google Drive':'thiết bị này'}`,'upload');}
+      else if(assetStorage==='server'){const existing=doc(job.docId);if(existing){existing.assetStorage='server';existing.updatedAt=now;}commit('Đồng bộ lại tài liệu',job.parentId,`${job.fileName} · Google Drive`,'upload');}
+      updateUploadJob(job,{phase:assetStorage==='server'?'complete':'local',loaded:job.total,percent:100});
+      if(assetStorage==='server')job.file=null;
+      return true;
+    } catch(error) {if(error?.name==='AbortError')updateUploadJob(job,{phase:'cancelled'});else{job.error=error?.message||'Không thể tải tệp lên.';updateUploadJob(job,{phase:'error'});}return false;}
+    finally{job.running=false;job.controller=null;renderUploadCenter();}
+  }
   async function handleUpload(fileList) {
     const files=Array.from(fileList||[]);
     if(!files.length)return;
     if(ui.uploading)return toast('Đang lưu đợt tải trước. Vui lòng chờ một chút.','warning');
     if(files.length>100)return toast('Mỗi lần vui lòng chọn không quá 100 tệp.','warning');
     const parentId=ui.folder;
-    ui.uploading=true;let accepted=0,sessionCount=0;const rejected=[];
+    ui.uploading=true;uploadPanelDismissed=false;let accepted=0,localCount=0;const rejected=[],jobs=[];
     try{
       for(const file of files) {
         const nameParts=file.name.split('.'),ext=nameParts.length>1?nameParts.pop().toLowerCase().slice(0,24):'';
         if(file.size>MAX_FILE_SIZE){rejected.push(`${file.name}: vượt quá 250 MB`);continue;}
         let name=nameParts.join('.').trim().replace(/[\\/\u0000-\u001f]/g,'').slice(0,90)||'Tài liệu';
         name=uniqueName(name,parentId);
-        const id=uid('doc'),assetStorage=await saveAsset(id,file,ui.folder),now=new Date().toISOString();
-        if(assetStorage==='session')sessionCount++;
-        state.documents.push({id,parentId,name,ext,bytes:file.size,ownerId:'u1',description:'',
-          updatedAt:now,createdAt:now,starred:false,kind:'file',sample:false,source:'upload',
-          assetStorage,mime:file.type||mimeFor(ext),deletedAt:null});
-        accepted++;
+        const job={id:uid('upload'),docId:uid('doc'),file,fileName:file.name,parentId,name,ext,total:file.size,loaded:0,percent:0,status:'queued',running:false,documentAdded:false};
+        uploadJobs.set(job.id,job);jobs.push(job);
       }
-      if(accepted) {
-        ui.page=1;ui.tab='all';ui.localQuery='';ui.query='';$('#globalSearch').value='';
-        commit(`Tải lên ${accepted} tài liệu`,parentId,`Lưu cục bộ tại ${fullPath(parentId)}.`,'upload');
-        toast(`Đã thêm ${accepted} tài liệu vào thư mục.`);
-      }
-      if(sessionCount)toast(`${sessionCount} tệp chỉ được giữ trong phiên hiện tại vì bộ nhớ trình duyệt không khả dụng.`,'warning');
+      renderUploadCenter();
+      for(const job of jobs){if(await runUploadJob(job)){accepted++;if(job.status==='local')localCount++;}}
+      if(accepted){ui.page=1;ui.tab='all';ui.localQuery='';ui.query='';$('#globalSearch').value='';renderWorkspace();toast(`Đã thêm ${accepted} tài liệu vào thư mục.`);}
+      if(localCount)toast(`${localCount} tệp đã lưu trên thiết bị nhưng chưa đồng bộ được lên Google Drive.`,'warning');
       if(rejected.length)toast(`Bỏ qua ${rejected.length} tệp. ${rejected[0]}`,'warning');
-    }catch(error){toast('Có lỗi khi lưu tệp. Hãy kiểm tra dung lượng bộ nhớ của trình duyệt.','error');}
+    }catch(error){toast(error?.message||'Có lỗi khi lưu tệp. Hãy kiểm tra kết nối mạng và thử lại.','error');}
     finally{ui.uploading=false;$('#fileInput').value='';}
   }
   function clearPreviewUrls() {ui.previewUrls.forEach(url=>URL.revokeObjectURL(url));ui.previewUrls=[];}
@@ -3059,6 +3143,10 @@ function openHelp() {
         case 'new-folder':openNewFolder();break;
         case 'new-text':openTextEditor();break;
         case 'upload':$('#fileInput').click();break;
+        case 'close-uploads':uploadPanelDismissed=true;renderUploadCenter();break;
+        case 'cancel-upload':uploadJobs.get(id)?.controller?.abort();break;
+        case 'retry-upload':{const job=uploadJobs.get(id);if(job){uploadPanelDismissed=false;await runUploadJob(job);}break;}
+        case 'dismiss-upload':uploadJobs.delete(id);renderUploadCenter();break;
         case 'open-item':if(folder(id))navigate(id);else await openPreview(id);break;
         case 'item-menu':itemMenu(id,target);break;
         case 'star-item':{
@@ -3076,6 +3164,9 @@ function openHelp() {
         case 'preview-tab':await openPreview(ui.previewId,target.dataset.tab);break;
         case 'tab':ui.tab=target.dataset.tab;ui.page=1;ui.selected.clear();renderWorkspace();break;
         case 'view':state.preferences.view=target.dataset.view;saveState();renderWorkspace();break;
+        case 'reset-filters':ui.filters={};ui.localQuery='';ui.page=1;ui.selected.clear();renderWorkspace();break;
+        case 'save-filters':state.preferences.savedSearchFilter={filters:{...ui.filters},query:ui.localQuery};saveState();renderWorkspace();toast('Đã lưu bộ lọc cho tài khoản hiện tại.');break;
+        case 'restore-filters':if(state.preferences.savedSearchFilter){ui.filters={...state.preferences.savedSearchFilter.filters};ui.localQuery=state.preferences.savedSearchFilter.query||'';ui.page=1;ui.selected.clear();renderWorkspace();}break;
         case 'sort-menu':
           showMenu(target,`<p class="menu-label">SẮP XẾP THEO</p>${[['updated','Cập nhật mới nhất'],['oldest','Cập nhật cũ nhất'],['name','Tên từ A đến Z'],['size','Dung lượng giảm dần']].map(([key,label])=>`<button class="menu-item" data-action="sort" data-sort="${key}">${icon('sort')}${e(label)}${state.preferences.sort===key?icon('check'):''}</button>`).join('')}`);break;
         case 'sort':state.preferences.sort=target.dataset.sort;ui.page=1;saveState();renderWorkspace();break;
@@ -3155,6 +3246,7 @@ function openHelp() {
     }
   });
   let globalSearchTimer,localSearchTimer,settingsSearchTimer;
+  document.addEventListener('toggle',event=>{if(event.target.id==='advancedSearch')ui.filtersOpen=event.target.open;},true);
   document.addEventListener('input',event=>{
     const target=event.target;
     if(target.id==='treeSearch') {ui.treeQuery=target.value;renderTree();}
@@ -3172,7 +3264,11 @@ function openHelp() {
   });
   document.addEventListener('change',async event=>{
     const target=event.target;
-    if(target.matches('[data-select]')) {
+    if(target.matches('[data-search-filter]')) {
+      const next={...ui.filters,[target.dataset.searchFilter]:target.type==='checkbox'?target.checked:target.value};
+      if(next.from&&next.to&&next.from>next.to || next.min&&next.max&&Number(next.min)>Number(next.max)){toast('Khoảng lọc không hợp lệ: giá trị bắt đầu phải nhỏ hơn hoặc bằng giá trị kết thúc.','warning');renderWorkspace();return;}
+      ui.filters=next;ui.page=1;ui.selected.clear();renderWorkspace();
+    } else if(target.matches('[data-select]')) {
       target.checked?ui.selected.add(target.dataset.select):ui.selected.delete(target.dataset.select);
       renderWorkspace();
     } else if(target.id==='selectAll') {

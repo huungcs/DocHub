@@ -18,6 +18,7 @@ const headScripts = `
   <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
   <script>if(window.pdfjsLib)window.pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js';</script>
   <script src="./assets/client-config.js"></script>
+  <script src="./assets/search-engine.js"></script>
   <script src="./assets/google-drive-client.js"></script>
   <script src="./assets/supabase-cloud-bridge.js"></script>
 `;
@@ -255,6 +256,7 @@ const authUiScript = `
 html = html.replace('</body>', `<script>${authUiScript}</script></body>`);
 
 const browserAssets = [
+  ['src/app/search-engine.js', 'search-engine.js'],
   ['src/config/client-config.js', 'client-config.js'],
   ['src/integrations/google-drive/client.js', 'google-drive-client.js'],
   ['src/integrations/supabase/cloud-bridge.js', 'supabase-cloud-bridge.js']

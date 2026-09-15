@@ -7,6 +7,7 @@ window.DocHubDrive = (() => {
 
   const DRIVE_API = 'https://www.googleapis.com/drive/v3';
   const UPLOAD_API = 'https://www.googleapis.com/upload/drive/v3';
+  const UPLOAD_CHUNK_SIZE = 8 * 1024 * 1024;
 
   async function request(url, token, options = {}) {
     const res = await fetch(url, {
@@ -55,40 +56,119 @@ window.DocHubDrive = (() => {
     return folder.id;
   }
 
+  function abortError() {
+    const error = new Error('Đã hủy tải tệp lên.');
+    error.name = 'AbortError';
+    return error;
+  }
+
+  function wait(ms, signal) {
+    return new Promise((resolve, reject) => {
+      if (signal?.aborted) return reject(abortError());
+      const timer = setTimeout(resolve, ms);
+      signal?.addEventListener('abort', () => {
+        clearTimeout(timer);
+        reject(abortError());
+      }, { once: true });
+    });
+  }
+
+  function uploadChunk(sessionUrl, token, chunk, start, total, mimeType, onProgress, signal) {
+    return new Promise((resolve, reject) => {
+      if (signal?.aborted) return reject(abortError());
+      const xhr = new XMLHttpRequest();
+      const end = start + chunk.size - 1;
+      const onAbort = () => xhr.abort();
+      xhr.open('PUT', sessionUrl);
+      xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+      xhr.setRequestHeader('Content-Type', mimeType);
+      xhr.setRequestHeader('Content-Range', total === 0 ? 'bytes */0' : `bytes ${start}-${end}/${total}`);
+      xhr.upload.onprogress = event => {
+        const loaded = Math.min(total, start + event.loaded);
+        onProgress?.({ phase: 'uploading', loaded, total, percent: Math.round(loaded / total * 100) });
+      };
+      xhr.onload = () => {
+        signal?.removeEventListener('abort', onAbort);
+        if (xhr.status === 200 || xhr.status === 201) {
+          try { resolve(JSON.parse(xhr.responseText)); }
+          catch (_) { reject(new Error('Google Drive trả về dữ liệu không hợp lệ.')); }
+        } else if (xhr.status === 308) {
+          resolve(null);
+        } else {
+          let message=`Lỗi Google Drive API (${xhr.status || 'mạng'})`;
+          try { message=JSON.parse(xhr.responseText).error?.message||message; } catch (_) {}
+          if(xhr.status===401)message='Phiên Google Drive đã hết hạn. Vui lòng đăng nhập lại Google.';
+          const error=new Error(message);error.status=xhr.status;reject(error);
+        }
+      };
+      xhr.onerror = () => {
+        signal?.removeEventListener('abort', onAbort);
+        reject(new Error('Mất kết nối khi đang tải lên Google Drive.'));
+      };
+      xhr.onabort = () => {
+        signal?.removeEventListener('abort', onAbort);
+        reject(abortError());
+      };
+      signal?.addEventListener('abort', onAbort, { once: true });
+      xhr.send(chunk);
+    });
+  }
+
   /**
-   * Tải tệp lên Google Drive (Dùng Multipart Upload)
+   * Tải tiếp nối theo khối. Người dùng nhận được tiến trình thật và mỗi khối
+   * có thể thử lại mà không phải gửi lại toàn bộ tệp.
    */
-  async function uploadFile(token, folderId, fileBlob, fileName, mimeType = 'application/octet-stream') {
+  async function uploadFile(token, folderId, fileBlob, fileName, mimeType = 'application/octet-stream', options = {}) {
+    const { onProgress, signal } = options;
     const metadata = {
       name: fileName,
       mimeType: mimeType || 'application/octet-stream',
       parents: folderId ? [folderId] : []
     };
-
-    const boundary = '-------DocHubUploadBoundary' + Math.random().toString(36).slice(2);
-    const delimiter = `\r\n--${boundary}\r\n`;
-    const closeDelimiter = `\r\n--${boundary}--`;
-
-    const metadataPart = delimiter +
-      'Content-Type: application/json; charset=UTF-8\r\n\r\n' +
-      JSON.stringify(metadata) +
-      delimiter +
-      `Content-Type: ${mimeType}\r\n` +
-      'Content-Transfer-Encoding: binary\r\n\r\n';
-
-    const metadataBlob = new Blob([metadataPart], { type: 'text/plain' });
-    const closeBlob = new Blob([closeDelimiter], { type: 'text/plain' });
-    const multipartBody = new Blob([metadataBlob, fileBlob, closeBlob]);
-
-    const res = await request(`${UPLOAD_API}/files?uploadType=multipart&fields=id,name,size,mimeType,webViewLink`, token, {
+    if (signal?.aborted) throw abortError();
+    onProgress?.({ phase: 'preparing', loaded: 0, total: fileBlob.size, percent: 0 });
+    const initResponse = await request(`${UPLOAD_API}/files?uploadType=resumable&fields=id,name,size,mimeType,webViewLink`, token, {
       method: 'POST',
       headers: {
-        'Content-Type': `multipart/related; boundary=${boundary}`
+        'Content-Type': 'application/json; charset=UTF-8',
+        'X-Upload-Content-Type': mimeType,
+        'X-Upload-Content-Length': String(fileBlob.size)
       },
-      body: multipartBody
+      body: JSON.stringify(metadata),
+      signal
     });
+    const sessionUrl = initResponse.headers.get('Location');
+    if (!sessionUrl) throw new Error('Google Drive không tạo được phiên tải tiếp nối.');
 
-    return await res.json();
+    if (fileBlob.size === 0) {
+      const result = await uploadChunk(sessionUrl, token, fileBlob, 0, 0, mimeType, onProgress, signal);
+      onProgress?.({ phase: 'complete', loaded: 0, total: 0, percent: 100 });
+      return result;
+    }
+
+    let result = null;
+    for (let start = 0; start < fileBlob.size; start += UPLOAD_CHUNK_SIZE) {
+      const chunk = fileBlob.slice(start, Math.min(fileBlob.size, start + UPLOAD_CHUNK_SIZE));
+      let attempt = 0;
+      while (true) {
+        try {
+          result = await uploadChunk(sessionUrl, token, chunk, start, fileBlob.size, mimeType, onProgress, signal);
+          break;
+        } catch (error) {
+          if (error.name === 'AbortError' || [400,401,403,404].includes(error.status) || attempt >= 2) throw error;
+          attempt++;
+          onProgress?.({
+            phase: 'retrying', loaded: start, total: fileBlob.size,
+            percent: Math.round(start / fileBlob.size * 100), attempt
+          });
+          await wait(700 * (2 ** (attempt - 1)), signal);
+        }
+      }
+      const loaded = Math.min(fileBlob.size, start + chunk.size);
+      onProgress?.({ phase: result ? 'complete' : 'uploading', loaded, total: fileBlob.size, percent: Math.round(loaded / fileBlob.size * 100) });
+    }
+    if (!result) throw new Error('Google Drive chưa xác nhận tệp đã tải xong.');
+    return result;
   }
 
   /**
