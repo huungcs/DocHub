@@ -1,0 +1,20 @@
+{
+  "name": "dochub",
+  "version": "2.2.0",
+  "description": "Hệ thống quản lý, lưu trữ và phân quyền tài liệu đa người dùng tích hợp Google Drive & Supabase",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js",
+    "build": "node scripts/build.js"
+  },
+  "keywords": [
+    "dochub",
+    "google-drive",
+    "supabase",
+    "document-management",
+    "multi-tenant"
+  ],
+  "author": "huungcs",
+  "license": "MIT"
+}
