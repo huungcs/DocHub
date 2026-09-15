@@ -3,6 +3,13 @@ const crypto=require('node:crypto');
 const {Readable}=require('node:stream');
 const {pipeline}=require('node:stream/promises');
 const fail=(status,message)=>Object.assign(new Error(message),{status});
+function documentExtension(ext,mime,name=''){
+ const clean=typeof ext==='string'?ext.trim().toLowerCase():'';
+ if(/^[a-z0-9]{1,24}$/.test(clean))return clean;
+ const types={'image/jpeg':'jpg','image/png':'png','image/webp':'webp','image/gif':'gif','application/pdf':'pdf','video/mp4':'mp4','text/plain':'txt','application/vnd.openxmlformats-officedocument.wordprocessingml.document':'docx'};
+ if(types[mime])return types[mime];
+ return /\.([a-z0-9]{1,24})$/i.exec(name)?.[1].toLowerCase()||'';
+}
 function seal(value,key,context){
  const iv=crypto.randomBytes(12),cipher=crypto.createCipheriv('aes-256-gcm',crypto.createHash('sha256').update(key).digest(),iv);
  cipher.setAAD(Buffer.from(context));const data=Buffer.concat([cipher.update(value,'utf8'),cipher.final()]);
@@ -77,7 +84,7 @@ function createApi(env=process.env,fetcher=fetch,logger=console){
      // Only the organization-scoped, RLS-filtered index can establish file membership.
      // Never infer membership from a matching folder ID or filename.
      output.documents=[];
-     for(const d of docs){output.documents.push({id:d.doc_uid,parentId:d.parent_folder_id,name:d.name,description:d.description||'',ext:d.ext,bytes:d.bytes,mime:d.mime_type,kind:'file',ownerId:'u1',source:'upload',assetStorage:'server',createdAt:d.created_at,updatedAt:d.updated_at,deletedAt:d.deleted_at||null});}
+     for(const d of docs){output.documents.push({id:d.doc_uid,parentId:d.parent_folder_id,name:d.name,description:d.description||'',ext:documentExtension(d.ext,d.mime_type,d.name),bytes:d.bytes,mime:d.mime_type,kind:'file',ownerId:'u1',source:'upload',assetStorage:'server',createdAt:d.created_at,updatedAt:d.updated_at,deletedAt:d.deleted_at||null});}
      if(!['owner','admin'].includes(c.member.organization_role)){output.logs=[];output.acl=[];output.groups=[];output.users=[{id:'u1',name:c.user.user_metadata?.full_name||c.user.email,email:c.user.email,groupIds:[],active:true}];}
      output.preferences={...output.preferences,driveSharingEnabled:false};result={state:output,revision:rows[0].revision};
     }
@@ -109,7 +116,7 @@ function createApi(env=process.env,fetcher=fetch,logger=console){
     const response=await fetcher('https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable&fields=id',{method:'POST',headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json','X-Upload-Content-Length':String(input.bytes),'X-Upload-Content-Type':mime},body:JSON.stringify({name:input.name,mimeType:mime,parents:[mappings[0].drive_folder_id]}),signal:AbortSignal.timeout(30000)});
     if(!response.ok)throw fail(502,'Không tạo được phiên tải vào kho Drive.');
     const location=response.headers.get('location');if(!location||new URL(location).hostname!=='www.googleapis.com')throw fail(502,'Phiên tải Drive không hợp lệ.');
-    const id=crypto.randomUUID();await db('organization_uploads',{method:'POST',body:JSON.stringify({id,organization_id:c.org,user_id:c.user.id,doc_uid:input.id,folder_uid:input.folder,name:input.name,ext:String(input.ext||'').slice(0,24),mime,bytes:input.bytes,encrypted_url:seal(location,key,id)})});result={id,chunkSize:2*1024*1024};
+    const id=crypto.randomUUID();await db('organization_uploads',{method:'POST',body:JSON.stringify({id,organization_id:c.org,user_id:c.user.id,doc_uid:input.id,folder_uid:input.folder,name:input.name,ext:documentExtension(input.ext,mime,input.name),mime,bytes:input.bytes,encrypted_url:seal(location,key,id)})});result={id,chunkSize:2*1024*1024};
    }else if(action==='upload-chunk'&&req.method==='PUT'){
     const id=url.searchParams.get('upload');if(!/^[0-9a-f-]{36}$/i.test(id||''))throw fail(400,'Phiên tải không hợp lệ.');
     const sessions=await db(`organization_uploads?id=eq.${id}&organization_id=eq.${c.org}&user_id=eq.${c.user.id}&select=*`),s=sessions[0];
@@ -141,4 +148,4 @@ function createApi(env=process.env,fetcher=fetch,logger=console){
  }
  return handler;
 }
-module.exports={createApi,seal,unseal};
+module.exports={createApi,seal,unseal,documentExtension};

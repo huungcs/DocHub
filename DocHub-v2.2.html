@@ -2336,6 +2336,11 @@ window.DocHubMedia={init,open,typeOf,getSession:()=>session};
   }
   const serverState=await window.DocHubAPI?.loadState();
   const cloudAccount=window.DocHubAPI?.connected?window.DocHubAPI.user:null;
+  if(cloudAccount&&serverState&&!validState(serverState)){
+    document.body.innerHTML='<main style="max-width:560px;margin:15vh auto;padding:24px;font:16px system-ui" role="alert"><h1>Chưa tải được không gian</h1><p>Dữ liệu máy chủ có bản ghi không hợp lệ. Hệ thống đã dừng tự lưu để bảo vệ dữ liệu và quyền truy cập. Không có tài liệu nào bị xóa.</p><button type="button" id="retryWorkspace">Tải lại</button></main>';
+    document.getElementById('retryWorkspace').onclick=()=>location.reload();
+    return;
+  }
   const localState=loadState();
   let state=serverState&&validState(serverState)?serverState:
     localState&&validState(localState)?localState:

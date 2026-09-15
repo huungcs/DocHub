@@ -621,7 +621,7 @@
             user_id: currentUser.id,
             doc_uid: id,
             name: fileMeta.name || id,
-            ext: (id.split('.').pop() || '').toLowerCase(),
+            ext: /^[a-z0-9]{1,24}$/i.test(options.ext||'')?options.ext.toLowerCase():(/\.([a-z0-9]{1,24})$/i.exec(options.fileName||blob.name||'')?.[1].toLowerCase()||''),
             bytes: blob.size || 0,
             mime_type: blob.type,
             google_drive_file_id: fileMeta.id,

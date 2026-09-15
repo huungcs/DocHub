@@ -1,7 +1,14 @@
 const {test}=require('node:test');
 const assert=require('node:assert/strict');
 const {Readable}=require('node:stream');
-const {createApi,seal,unseal}=require('../../src/server/organization-api');
+const {createApi,seal,unseal,documentExtension}=require('../../src/server/organization-api');
+test('Invalid legacy extensions never become document IDs in the workspace',()=>{
+ assert.equal(documentExtension('doc-c4493418-dda8-4dee-9bbe-b714bc6a0e22','image/jpeg'),'jpg');
+ assert.equal(documentExtension(' JPG ','image/jpeg'),'jpg');
+ assert.equal(documentExtension(null,'unknown','report.xlsx'),'xlsx');
+ assert.equal(documentExtension('invalid-id','unknown','filename'),'');
+ assert.equal(documentExtension('x'.repeat(25),'application/pdf'),'pdf');
+});
 const org='11111111-1111-1111-1111-111111111111';
 test('Workspace excludes stale account files and returns only organization-indexed files',async()=>{
  const snapshot={folders:[{id:'all',parentId:null}],documents:[{id:'stale-id',parentId:'all',name:'same-name',assetStorage:'server'}],preferences:{}};
@@ -12,12 +19,13 @@ test('Workspace excludes stale account files and returns only organization-index
   else if(url.includes('/organizations?'))data=[{owner_id:'owner'}];
   else if(url.includes('user_workspaces'))data=[{state:snapshot,revision:1}];
   else if(url.includes('organization_folders'))data=[{folder_uid:'all'}];
-  else if(url.includes('documents_index')){assert.ok(url.includes('organization_id=eq.'+org));data=[{doc_uid:'indexed-id',parent_folder_id:'all',name:'same-name',ext:'jpg'}];}
+  else if(url.includes('documents_index')){assert.ok(url.includes('organization_id=eq.'+org));data=[{doc_uid:'indexed-id',parent_folder_id:'all',name:'same-name',ext:'doc-invalid-legacy-extension-longer-than-24',mime_type:'image/jpeg'}];}
   else assert.fail('Unexpected request');
   return {ok:true,status:200,json:async()=>data};
  });
  const res=response();await api(request('/api/organization?action=workspace&organization='+org,{authorization:'Bearer jwt'}),res);
  assert.deepEqual(res.data.state.documents.map(d=>d.id),['indexed-id']);
+ assert.equal(res.data.state.documents[0].ext,'jpg');
  assert.equal(snapshot.documents[0].id,'stale-id','Original snapshot is preserved');
 });
 test('Network diagnostics correlate responses without leaking credentials',async()=>{
