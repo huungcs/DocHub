@@ -82,6 +82,50 @@
     } catch (_) {}
   }
 
+  async function getDriveMeta(id) {
+    const key = userCacheKey(id);
+    const cached = await cacheGet('meta', key);
+    if (cached?.driveId) return cached;
+    if (!currentUser || !supabase) return null;
+
+    let query = supabase
+      .from('documents_index')
+      .select('google_drive_file_id,mime_type,name,parent_folder_id')
+      .eq('doc_uid', id)
+      .not('google_drive_file_id', 'is', null);
+    query = organization?.id
+      ? query.eq('organization_id', organization.id)
+      : query.eq('user_id', currentUser.id);
+    const { data, error } = await query.limit(1).maybeSingle();
+    if (error) throw new Error(`Không đọc được nguồn tệp Drive: ${error.message}`);
+    if (!data?.google_drive_file_id) return null;
+    const meta = {
+      driveId: data.google_drive_file_id,
+      mime: data.mime_type || 'application/octet-stream',
+      name: data.name || id,
+      parentFolderId: data.parent_folder_id || 'all'
+    };
+    await cacheSet('meta', key, meta);
+    return meta;
+  }
+
+  async function postStreamWorker(message) {
+    if (!('serviceWorker' in navigator) || !window.isSecureContext) return false;
+    const registration = await navigator.serviceWorker.register('/drive-stream-sw.js', { scope: '/' });
+    await navigator.serviceWorker.ready;
+    const worker = navigator.serviceWorker.controller || registration.active;
+    if (!worker) return false;
+    return await new Promise(resolve => {
+      const channel = new MessageChannel();
+      const timeout = setTimeout(() => resolve(false), 3000);
+      channel.port1.onmessage = event => {
+        clearTimeout(timeout);
+        resolve(event.data?.ok === true);
+      };
+      worker.postMessage(message, [channel.port2]);
+    });
+  }
+
   // Browser cache is namespaced by Supabase user to prevent cross-account data leaks.
   function userCacheKey(key) {
     return `${currentUser?.id || 'guest'}:${key}`;
@@ -450,7 +494,7 @@
 
     // 2. Nếu không có trong cache, tải từ Google Drive
     if (providerToken && window.DocHubDrive) {
-      const meta = await cacheGet('meta', userCacheKey(id));
+      const meta = await getDriveMeta(id);
       if (meta?.driveId) {
         try {
           const blob = await window.DocHubDrive.downloadFileBlob(providerToken, meta.driveId);
@@ -464,6 +508,35 @@
       }
     }
     return null;
+  };
+
+  /**
+   * Tạo nguồn phát cùng miền cho video/audio Drive. Trình duyệt sẽ tự gửi các
+   * yêu cầu Range; Service Worker chuyển tiếp chúng mà không tải toàn bộ tệp.
+   */
+  api.getAssetStream = async (id, parentFolderId = 'all', mime = 'application/octet-stream') => {
+    await api.requirePermission(parentFolderId, 'read');
+    if (!providerToken) return null;
+    const meta = await getDriveMeta(id);
+    if (!meta?.driveId) return null;
+    const key = globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    const registered = await postStreamWorker({
+      type: 'DOCHUB_STREAM_REGISTER',
+      key,
+      fileId: meta.driveId,
+      googleToken: providerToken,
+      mime: mime || meta.mime
+    });
+    if (!registered) return null;
+    return {
+      key,
+      url: `/__dochub_drive_stream__/${encodeURIComponent(key)}/${encodeURIComponent(meta.name || id)}`
+    };
+  };
+
+  api.releaseAssetStream = async key => {
+    if (!key) return;
+    await postStreamWorker({ type: 'DOCHUB_STREAM_RELEASE', key }).catch(() => {});
   };
 
   /**

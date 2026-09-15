@@ -15,6 +15,8 @@ let html = fs.readFileSync(srcPath, 'utf8');
 const headScripts = `
   <!-- Supabase JS & DocHub Cloud Integrations -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
+  <script>if(window.pdfjsLib)window.pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js';</script>
   <script src="./assets/client-config.js"></script>
   <script src="./assets/google-drive-client.js"></script>
   <script src="./assets/supabase-cloud-bridge.js"></script>
@@ -261,6 +263,12 @@ const browserAssets = [
 for (const [source, output] of browserAssets) {
   fs.copyFileSync(path.join(projectRoot, source), path.join(assetsPath, output));
 }
+
+// Must live at the site root so it can intercept the virtual media URLs.
+fs.copyFileSync(
+  path.join(projectRoot, 'src', 'integrations', 'google-drive', 'stream-worker.js'),
+  path.join(distPath, 'drive-stream-sw.js')
+);
 
 fs.writeFileSync(destPath, html, 'utf8');
 fs.writeFileSync(path.join(projectRoot, 'index.html'), html, 'utf8');
