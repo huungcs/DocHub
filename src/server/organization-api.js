@@ -73,8 +73,10 @@ function createApi(env=process.env,fetcher=fetch,logger=console){
      for(const f of folders.filter(f=>ids.has(f.id))){let cursor=f,seen=new Set();while(cursor&&!seen.has(cursor.id)){seen.add(cursor.id);ancestors.add(cursor.id);cursor=folders.find(p=>p.id===cursor.parentId);}}
      output.folders=folders.filter(f=>ancestors.has(f.id)).map(f=>ids.has(f.id)?f:{id:f.id,parentId:f.parentId,name:f.name,kind:'folder',inherit:false,deletedAt:null});
      const docs=await db(`documents_index?organization_id=eq.${c.org}&select=*`,{},c.bearer);
-     const indexed=new Set(docs.map(d=>d.doc_uid));
-     output.documents=(state.documents||[]).filter(d=>ids.has(d.parentId)&&!indexed.has(d.id));
+     // Account snapshots are legacy data shared by multiple organizations.
+     // Only the organization-scoped, RLS-filtered index can establish file membership.
+     // Never infer membership from a matching folder ID or filename.
+     output.documents=[];
      for(const d of docs){output.documents.push({id:d.doc_uid,parentId:d.parent_folder_id,name:d.name,description:d.description||'',ext:d.ext,bytes:d.bytes,mime:d.mime_type,kind:'file',ownerId:'u1',source:'upload',assetStorage:'server',createdAt:d.created_at,updatedAt:d.updated_at,deletedAt:d.deleted_at||null});}
      if(!['owner','admin'].includes(c.member.organization_role)){output.logs=[];output.acl=[];output.groups=[];output.users=[{id:'u1',name:c.user.user_metadata?.full_name||c.user.email,email:c.user.email,groupIds:[],active:true}];}
      output.preferences={...output.preferences,driveSharingEnabled:false};result={state:output,revision:rows[0].revision};

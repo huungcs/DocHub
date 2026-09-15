@@ -292,7 +292,19 @@
     authReadyResolve(value);
   }
 
-  async function applySession(session, event = 'INITIAL_SESSION') {
+  let sessionWork=null,sessionWorkKey=null,lastSessionKey=null;
+  function applySession(session,event='INITIAL_SESSION'){
+    const key=session?.user?.id?`${session.user.id}:${session.access_token||''}:${session.provider_token||''}`:null;
+    if(key&&sessionWorkKey===key&&sessionWork)return sessionWork;
+    if(key&&lastSessionKey===key&&organization&&authorizationStatus==='ready')return Promise.resolve(true);
+    if(!key)lastSessionKey=null;
+    sessionWorkKey=key;
+    const work=applySessionOnce(session,event).then(result=>{if(result&&authorizationStatus==='ready')lastSessionKey=key;return result;});
+    sessionWork=work;
+    void work.finally(()=>{if(sessionWork===work){sessionWork=null;sessionWorkKey=null;}}).catch(()=>{});
+    return work;
+  }
+  async function applySessionOnce(session, event = 'INITIAL_SESSION') {
     authError = googleProviderEnabled === false ?
       'Google Provider chưa được bật trong Supabase Authentication.' : null;
     currentUser = session?.user || null;
@@ -326,11 +338,22 @@
 
     if (providerToken && window.DocHubDrive && connectedDriveToken !== providerToken) {
       try {
-        if(organization.role==='owner')await mirrorDriveFolders();
+        if(organization.role==='owner'){
+          // Folder mirroring is independent of loading the workspace; do not block first paint.
+          const ownerId=currentUser.id,orgId=organization.id,token=providerToken;
+          setTimeout(()=>{
+            if(currentUser?.id!==ownerId||organization?.id!==orgId||providerToken!==token)return;
+            mirrorDriveFolders().catch(()=>{
+              if(currentUser?.id===ownerId&&organization?.id===orgId){
+                connectedDriveToken=null;authError='Chưa đồng bộ được cây thư mục Drive. Bạn có thể thử lại sau.';emitAuth('DRIVE_MIRROR_ERROR');
+              }
+            });
+          },0);
+        }
         else googleDriveFolderId=null;
         connectedDriveToken = providerToken;
         authStatus = 'ready';
-        console.log('DocHub: Đã kết nối thư mục Google Drive ID:', googleDriveFolderId);
+        // Connection success is determined by backend status, not a possibly empty folder ID.
       } catch (driveErr) {
         googleDriveFolderId = null;
         connectedDriveToken = null;
@@ -344,7 +367,7 @@
 
     try {
       const status=await (await backend('status')).json();organizationBackend=true;
-      if(organization.role==='owner'&&session.provider_refresh_token){
+      if(organization.role==='owner'&&session.provider_refresh_token&&(!status.connected||event==='SIGNED_IN')){
         await backend('connect',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({refreshToken:session.provider_refresh_token})});
       }else if(organization.role==='owner'&&!status.connected){
         authError='Đăng nhập Google lại một lần để kết nối kho doanh nghiệp.';

@@ -2621,13 +2621,36 @@ window.DocHubMedia={init,open,typeOf,getSession:()=>session};
       <div class="file-card-bottom"><div class="owner-wrap">${avatar(user(item.ownerId),true)}<span>${e(user(item.ownerId)?.name||'')}</span></div><span>${date(item.updatedAt)}</span></div>
     </article>`;
   }
-  let thumbnailGeneration=0,thumbnailUrls=[];
-  async function renderThumbnails() {
-    const gen=++thumbnailGeneration;thumbnailUrls.forEach(URL.revokeObjectURL);thumbnailUrls=[];
-    for(const img of $$('[data-thumb-id]')) {
-      const blob=await getAsset(img.dataset.thumbId);if(gen!==thumbnailGeneration)return;
-      if(blob){const url=URL.createObjectURL(blob);thumbnailUrls.push(url);img.src=url;}
+  let thumbnailGeneration=0,thumbnailUrls=[],thumbnailObserver=null,thumbnailActive=0,thumbnailQueue=[];
+  function drainThumbnails(){
+    while(thumbnailActive<3&&thumbnailQueue.length){
+      const {img,gen}=thumbnailQueue.shift();
+      if(gen!==thumbnailGeneration||!img.isConnected)continue;
+      thumbnailActive++;
+      (async()=>{
+        try{
+          const blob=await getAsset(img.dataset.thumbId);
+          if(gen!==thumbnailGeneration||!img.isConnected)return;
+          if(blob){const url=URL.createObjectURL(blob);thumbnailUrls.push(url);img.decoding='async';img.src=url;}
+          else img.hidden=true;
+        }catch{
+          if(gen===thumbnailGeneration&&img.isConnected){img.hidden=true;img.parentElement.title='Chưa tải được ảnh xem trước. Bấm để mở tài liệu.';}
+        }finally{thumbnailActive--;drainThumbnails();}
+      })();
     }
+  }
+  function renderThumbnails() {
+    const gen=++thumbnailGeneration;
+    thumbnailObserver?.disconnect();thumbnailQueue=[];
+    thumbnailUrls.forEach(URL.revokeObjectURL);thumbnailUrls=[];
+    const images=$$('[data-thumb-id]');
+    const enqueue=img=>{thumbnailQueue.push({img,gen});drainThumbnails();};
+    if(!('IntersectionObserver' in window)){images.forEach(enqueue);return;}
+    thumbnailObserver=new IntersectionObserver(entries=>{
+      if(gen!==thumbnailGeneration)return;
+      for(const entry of entries)if(entry.isIntersecting){thumbnailObserver.unobserve(entry.target);enqueue(entry.target);}
+    },{rootMargin:'160px'});
+    images.forEach(img=>thumbnailObserver.observe(img));
   }
   // 2.1 PHONE BRIDGE: desktop always uses its existing preference.
   const phoneQuery='(max-width:700px), (max-width:1000px) and (max-height:500px) and (pointer:coarse)';
@@ -3338,6 +3361,7 @@ function openHelp() {
           if(!window.DocHubAPI?.connected){toast('Đăng nhập để xem các tổ chức đã tham gia.','info');break;}
           openForm({title:'Chuyển không gian',subtitle:'Dữ liệu và quyền truy cập riêng cho từng tổ chức',symbol:'building',kind:'help',body:'<p role="status">Đang tải các tổ chức của bạn…</p>'});
           const organizations=await window.DocHubAPI.listOrganizations();
+          for(const org of organizations)org.name=`${org.name} · ${org.id.slice(0,8)}`;
           openForm({title:'Chuyển không gian',subtitle:`${organizations.length} tổ chức đã tham gia`,symbol:'building',kind:'help',body:`<div class="organization-options">${organizations.map(org=>`<button type="button" class="organization-option" data-action="select-workspace" data-id="${e(org.id)}" ${org.id===window.DocHubAPI.organization?.id?'disabled aria-current="true"':''}><span class="workspace-avatar">${icon('building')}</span><span><strong>${e(org.name)}</strong><small>${e(({owner:'Chủ sở hữu',admin:'Quản trị viên',member:'Thành viên'})[org.role]||'Thành viên')}</small></span><span>${org.id===window.DocHubAPI.organization?.id?'Đang chọn':icon('chevron')}</span></button>`).join('')||'<p>Bạn chưa tham gia tổ chức nào.</p>'}</div><p class="principal-caption">Chỉ những tài liệu được cấp quyền mới hiển thị trong không gian đã chọn.</p>`});
           break;
         }
