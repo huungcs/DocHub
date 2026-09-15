@@ -2348,7 +2348,7 @@ window.DocHubMedia={init,open,typeOf,getSession:()=>session};
     folder:state.preferences.lastFolder || 'salary',
     expanded:new Set(state.preferences.expanded || ['admin']),
     tab:'all',query:'',localQuery:'',treeQuery:'',page:1,selected:new Set(),filters:{},filtersOpen:false,
-    settings:'permissions',settingsQuery:'',permissionFolder:'salary',inspectUser:'u2',
+    settings:'permissions',settingsQuery:'',permissionFolder:'salary',inspectUser:state.users[0]?.id||'',
     previewId:null,previewTab:'preview',previewUrls:[],uploading:false
   };
   const folder = id => state.folders.find(f=>f.id===id);
@@ -2405,6 +2405,15 @@ window.DocHubMedia={init,open,typeOf,getSession:()=>session};
       current=folder(current.parentId);
     }
     return result;
+  }
+  function resolveInspectUser(users,selectedId) {
+    return users.some(person=>person.id===selectedId)?selectedId:(users[0]?.id||'');
+  }
+  function inspectUserMessage(person) {
+    if(!person)return 'Chưa có người dùng để kiểm tra quyền.';
+    if(person.active===false)return 'Tài khoản đã tạm dừng nên không có quyền hiệu lực.';
+    if(person.active!==true)return 'Chưa xác định được trạng thái tài khoản.';
+    return 'Không tìm thấy quyền trong dữ liệu hiện có. Máy chủ sẽ kiểm tra quyền khi thao tác.';
   }
   function effectivePermissions(userId,resourceId) {
     const person=user(userId);
@@ -2786,6 +2795,7 @@ window.DocHubMedia={init,open,typeOf,getSession:()=>session};
     if(!active(folder(ui.permissionFolder)))ui.permissionFolder=ui.folder;
     const current=folder(ui.permissionFolder);
     const rules=inheritedRules(current.id).sort((a,b)=>Number(b.inherited)-Number(a.inherited));
+    ui.inspectUser=resolveInspectUser(state.users,ui.inspectUser);
     const check=effectivePermissions(ui.inspectUser,current.id);
     const parent=folder(current.parentId);
     const hasParent=!!parent;
@@ -2802,7 +2812,7 @@ window.DocHubMedia={init,open,typeOf,getSession:()=>session};
       <section class="settings-card"><div class="settings-card-heading"><div><h3>Kiểm tra quyền người dùng</h3><p>Xem quyền hiệu lực và nguồn cấp quyền đang đồng bộ với máy chủ.</p></div>${icon('eye')}</div>
         <div class="inspector-controls"><select id="inspectUser" aria-label="Người dùng cần kiểm tra">${state.users.map(person=>`<option value="${e(person.id)}" ${person.id===ui.inspectUser?'selected':''}>${e(person.name)}${!person.active?' — Đã tạm dừng':''}</option>`).join('')}</select></div>
         <div class="permission-chips">${Object.entries(ACTIONS).map(([key,label])=>`<span class="permission-chip ${check.permissions.includes(key)?'allowed':''}">${icon(check.permissions.includes(key)?'check':'close')}${e(label)}</span>`).join('')}</div>
-        <div class="source-list">${check.sources.length?check.sources.map(rule=>`<p>${icon('link','tiny')} ${e(principalName(rule))} → <strong>${e(ROLES[rule.role].label)}</strong> · ${rule.inherited?`Kế thừa từ ${e(folder(rule.sourceId)?.name)}`:'Cấp trực tiếp tại thư mục này'}</p>`).join(''):`<p>${user(ui.inspectUser)?.active?'Không có quyền phù hợp. Mặc định không được truy cập.':'Tài khoản đã tạm dừng nên không có quyền hiệu lực.'}</p>`}</div>
+        <div class="source-list">${check.sources.length?check.sources.map(rule=>`<p>${icon('link','tiny')} ${e(principalName(rule))} → <strong>${e(ROLES[rule.role].label)}</strong> · ${rule.inherited?`Kế thừa từ ${e(folder(rule.sourceId)?.name)}`:'Cấp trực tiếp tại thư mục này'}</p>`).join(''):`<p>${e(inspectUserMessage(user(ui.inspectUser)))}</p>`}</div>
         <details class="matrix-details"><summary>Chi tiết các vai trò và quyền tương ứng</summary><div class="matrix-scroll"><table class="role-matrix"><thead><tr><th>Vai trò</th>${Object.values(ACTIONS).map(label=>`<th>${e(label)}</th>`).join('')}</tr></thead><tbody>${Object.values(ROLES).map(role=>`<tr><td>${e(role.label)}</td>${Object.keys(ACTIONS).map(key=>`<td class="${role.permissions.includes(key)?'yes':''}">${role.permissions.includes(key)?'✓':'—'}</td>`).join('')}</tr>`).join('')}</tbody></table></div></details>
       </section>
       <div class="info-callout">${icon('shield')}<span>Khi đăng nhập Cloud, Supabase RLS kiểm tra quyền bằng danh tính thật trước mọi thao tác tệp. JavaScript chỉ hiển thị kết quả và không thể tự cấp thêm quyền.</span></div>
