@@ -192,7 +192,47 @@ window.DocHubDrive = (() => {
     }
   }
 
+  async function listPermissions(token,fileId) {
+    const result=[];let pageToken='';
+    do {
+      const response=await request(`${DRIVE_API}/files/${encodeURIComponent(fileId)}/permissions?fields=nextPageToken,permissions(id,type,emailAddress,role)&supportsAllDrives=true${pageToken?'&pageToken='+encodeURIComponent(pageToken):''}`,token);
+      const data=await response.json();result.push(...(data.permissions||[]));pageToken=data.nextPageToken||'';
+    } while(pageToken);
+    return result;
+  }
+  async function setUserPermission(token,fileId,email,role,permissionId=null) {
+    if(!['reader','writer'].includes(role)||!email||!email.includes('@'))throw new Error('Quyền Drive không hợp lệ.');
+    const base=`${DRIVE_API}/files/${encodeURIComponent(fileId)}/permissions`;
+    const response=await request(permissionId?`${base}/${encodeURIComponent(permissionId)}?supportsAllDrives=true`:`${base}?supportsAllDrives=true&sendNotificationEmail=false&fields=id`,token,{
+      method:permissionId?'PATCH':'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify(permissionId?{role}:{type:'user',emailAddress:email,role})
+    });
+    return response.json();
+  }
+  async function removePermission(token,fileId,permissionId) {
+    await request(`${DRIVE_API}/files/${encodeURIComponent(fileId)}/permissions/${encodeURIComponent(permissionId)}?supportsAllDrives=true`,token,{method:'DELETE'});
+  }
+  async function getOrCreateMirroredFolder(token,organizationId,folderUid,name,parentId=null) {
+    const literal=value=>String(value).replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+    const q=`mimeType='application/vnd.google-apps.folder' and trashed=false and appProperties has { key='dochub_org' and value='${literal(organizationId)}' } and appProperties has { key='dochub_folder' and value='${literal(folderUid)}' }`;
+    const response=await request(`${DRIVE_API}/files?q=${encodeURIComponent(q)}&fields=files(id,name,parents)&spaces=drive`,token);
+    const files=(await response.json()).files||[];
+    if(files.length>1)throw new Error('Có nhiều thư mục Drive cùng ánh xạ. Cần đối soát trước khi tiếp tục.');
+    if(files[0])return files[0];
+    return (await request(`${DRIVE_API}/files?fields=id,name,parents`,token,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,mimeType:'application/vnd.google-apps.folder',parents:parentId?[parentId]:undefined,appProperties:{dochub_org:organizationId,dochub_folder:folderUid}})})).json();
+  }
+  async function reconcileFolder(token,fileId,name,parentId=null) {
+    const meta=await (await request(`${DRIVE_API}/files/${encodeURIComponent(fileId)}?fields=id,name,parents,trashed`,token)).json();
+    if(meta.trashed)throw new Error('Thư mục Drive đã ở thùng rác. Khôi phục trước khi đồng bộ.');
+    const move=parentId&&!(meta.parents||[]).includes(parentId);
+    if(meta.name===name&&!move)return meta;
+    const params=new URLSearchParams({fields:'id,name,parents'});
+    if(move){params.set('addParents',parentId);if(meta.parents?.length)params.set('removeParents',meta.parents.join(','));}
+    return (await request(`${DRIVE_API}/files/${encodeURIComponent(fileId)}?${params}`,token,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({name})})).json();
+  }
   return {
+    getOrCreateMirroredFolder,reconcileFolder,
+    listPermissions,setUserPermission,removePermission,
     getOrCreateAppFolder,
     uploadFile,
     downloadFileBlob,

@@ -27,3 +27,11 @@ test('Filter layout groups ranges and progressively stacks on mobile',()=>{
   assert.match(app, /\.search-filter-grid\{grid-template-columns:minmax\(0,1fr\)/);
   assert.match(app, /inputmode="decimal"/);
 });
+test('Mobile filters open a labelled modal sheet from an icon inside search',()=>{
+  const app=fs.readFileSync(path.join(__dirname,'../../src/app/index.template.html'),'utf8');
+  assert.match(app,/id="filterSheet" class="filter-sheet" aria-labelledby="filterSheetTitle"/);
+  assert.match(app,/searchHost\.append\(filterButton\)/);
+  assert.match(app,/case 'open-filters':renderFilterSheet\(\);showDialog\('filterSheet'\)/);
+  assert.match(app,/\.content-card>\.search-filters\{display:none\}/);
+  assert.match(app,/filter-sheet::backdrop/);
+});

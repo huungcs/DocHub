@@ -326,6 +326,10 @@ dialog[open]{animation:dialog-in .17s ease-out}
 .checkbox-option input{margin:0}
 .inline-check{display:flex;gap:9px;align-items:flex-start;font-size:12px;cursor:pointer;line-height:1.7}
 .inline-check input{margin-top:2px}
+.field>label.inline-check{display:flex;align-items:center;gap:10px;min-height:44px;margin:0;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--surface-soft);font-size:12px;font-weight:500;line-height:1.5;cursor:pointer}
+.field>label.inline-check>input{margin:0;flex:0 0 18px;width:18px;height:18px}
+.field>label.inline-check>span{min-width:0;overflow-wrap:anywhere}
+.field>label.inline-check:focus-within{border-color:var(--brand)}
 .info-callout{display:flex;align-items:flex-start;gap:10px;border:1px solid color-mix(in srgb,var(--brand) 10%,transparent);background:var(--brand-soft);color:var(--brand-ink);border-radius:9px;padding:12px 13px;font-size:11px;line-height:1.7}
 .info-callout>.icon{width:17px;height:17px;margin-top:1px;flex-shrink:0}
 .info-callout.warning{background:var(--amber-soft);color:var(--amber);border-color:color-mix(in srgb,var(--amber) 15%,transparent)}
@@ -521,6 +525,20 @@ dialog[open]{animation:dialog-in .17s ease-out}
 .search-filter-footer{display:flex;justify-content:space-between;align-items:center;gap:16px;margin-top:18px;padding-top:14px;border-top:1px solid var(--line)}
 .search-filter-hint{font-size:11px;color:var(--muted);line-height:1.7;max-width:520px}
 .search-filter-actions{display:flex;gap:8px;flex-wrap:wrap;flex-shrink:0}
+.mobile-filter-button{display:none}
+@media(max-width:700px){.content-card .filter-search:has(.mobile-filter-button) input{padding-right:48px!important}}
+.filter-sheet{padding:0;border:1px solid var(--line);background:var(--surface);color:var(--text);width:min(540px,100%);max-height:90dvh;overflow:hidden}
+.filter-sheet::backdrop{background:#15243c66;backdrop-filter:blur(5px)}
+.filter-sheet[open]{display:flex;flex-direction:column}
+.filter-sheet-handle{width:36px;height:4px;border-radius:99px;background:var(--line-strong);margin:9px auto 0;flex-shrink:0}
+.filter-sheet-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:15px 18px;border-bottom:1px solid var(--line);flex-shrink:0}
+.filter-sheet-heading h2{font-size:17px}
+.filter-sheet-heading p{font-size:11px;color:var(--muted);margin-top:3px}
+.filter-sheet-content{overflow:auto;min-height:0;overscroll-behavior:contain;padding-top:15px}
+.filter-sheet-footer{padding:12px 16px calc(12px + env(safe-area-inset-bottom,0px));border-top:1px solid var(--line);background:var(--surface);flex-shrink:0}
+.filter-sheet-footer .btn{width:100%;min-height:46px}
+@media(max-width:700px){.content-card>.search-filters{display:none}.content-card .filter-search{position:relative}.content-card .filter-search input{padding-right:48px!important}.mobile-filter-button{display:grid;place-items:center;position:absolute;right:3px;top:50%;transform:translateY(-50%);width:42px;height:42px;color:var(--muted);border-radius:8px}.mobile-filter-button.active{color:var(--brand);background:var(--brand-soft)}.mobile-filter-button .icon{width:18px;height:18px}.mobile-filter-button.active::after{content:'';position:absolute;right:7px;top:7px;width:5px;height:5px;border-radius:50%;background:var(--brand)}.filter-sheet{position:fixed!important;inset:auto 0 0!important;margin:0!important;width:100%!important;max-width:100%!important;max-height:88dvh!important;height:auto!important;border-radius:22px 22px 0 0!important;animation:filter-sheet-in .2s ease-out}.filter-sheet .search-filter-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.filter-sheet .search-filter-field:has(fieldset){grid-column:1/-1}.filter-sheet fieldset.search-filter-field{grid-column:1/-1}.filter-sheet .search-filter-field:last-child{grid-column:1/-1}.filter-sheet .search-filter-hint{font-size:10px}.filter-sheet .search-filter-field select{font-size:16px}.filter-sheet .search-filter-body{padding-inline:16px}.filter-sheet .search-filter-grid>.search-filter-field:first-child{grid-column:1/-1}}
+@media(prefers-reduced-motion:no-preference){@keyframes filter-sheet-in{from{transform:translateY(30px);opacity:0}to{transform:translateY(0);opacity:1}}}
 @media(max-width:1200px){.search-filter-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.search-filter-footer{align-items:flex-start;flex-direction:column}}
 @media(max-width:700px){.search-filters>summary{padding:12px 14px;min-height:48px}.search-filter-body{padding:4px 14px 16px}.search-filter-grid{grid-template-columns:minmax(0,1fr);gap:14px}.search-filter-field input:not([type=checkbox]),.search-filter-field select{min-height:46px;height:46px;font-size:16px}.search-filter-label,.search-filter-field>legend{font-size:12px}.search-filter-pin{min-height:46px;font-size:13px}.search-filter-actions{width:100%;display:grid;grid-template-columns:1fr 1fr}.search-filter-actions .btn{min-height:44px;padding:9px 8px;font-size:12px;white-space:normal}.search-filter-actions .search-filter-restore{grid-column:1/-1}}
 .toast .text-button{white-space:nowrap;font-size:11px}
@@ -756,7 +774,64 @@ body.has-uploads .toast-stack{bottom:415px}
   .inspector-controls select,.role-select{font-size:16px!important}
 }
 
-</style>
+.permission-folder-trigger{display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;min-height:48px;padding:8px 10px;border:1px solid var(--line-strong);border-radius:9px;background:var(--surface);text-align:left}
+.permission-folder-trigger>span{min-width:0}.permission-folder-trigger strong{display:block;font-size:12px;color:var(--ink)}.permission-folder-trigger small{display:block;font-size:10px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-top:2px}
+.permission-picker[open]{display:flex;flex-direction:column;width:min(580px,calc(100vw - 32px));max-height:82dvh;padding:0;overflow:hidden}
+.permission-picker .dialog-heading{flex-shrink:0}
+.permission-picker-search{padding:14px 18px 10px;flex-shrink:0;border-bottom:1px solid var(--line)}
+.permission-picker-search .filter-search{width:100%;max-width:none}.permission-picker-search input{width:100%;font-size:16px!important;min-height:44px!important}
+#permissionPickerCount{display:block;font-size:10px;color:var(--muted);margin-top:9px}
+.permission-picker-list{overflow:auto;min-height:0;overscroll-behavior:contain;padding:8px 12px 16px;scrollbar-width:thin;scrollbar-color:var(--line-strong) transparent}
+.permission-folder-option{display:flex;align-items:center;gap:10px;min-height:62px;width:100%;padding:10px;border:1px solid transparent;border-radius:10px;text-align:left;margin:3px 0}
+.permission-folder-option:hover{background:var(--surface-soft)}.permission-folder-option.selected{background:var(--brand-soft);border-color:var(--line-strong);color:var(--brand-ink)}
+.permission-folder-copy{flex:1;min-width:0}.permission-folder-copy strong{display:block;font-size:12px;color:var(--ink);overflow-wrap:anywhere}.permission-folder-copy small{display:block;font-size:10px;color:var(--muted);line-height:1.6;margin-top:3px;overflow-wrap:anywhere}
+.permission-picker-empty{padding:24px 12px;font-size:12px;color:var(--muted);text-align:center}
+@media(max-width:700px){
+ #permissionPicker[open]{position:fixed;left:0!important;right:0!important;top:auto!important;bottom:var(--m-keyboard-offset,0px)!important;margin:0!important;width:100%!important;max-width:100%!important;height:min(680px,85dvh)!important;max-height:calc(var(--m-vh,100dvh) - 16px)!important;border:0;border-radius:22px 22px 0 0!important;overflow:hidden;box-sizing:border-box}
+ #permissionPicker .permission-picker-list{flex:1;min-height:0;overflow-x:hidden;overflow-y:auto;padding-bottom:calc(16px + env(safe-area-inset-bottom,0px));scrollbar-width:thin;scrollbar-gutter:stable}
+ #permissionPicker .permission-picker-list::-webkit-scrollbar{width:4px}
+ #permissionPicker .permission-picker-list::-webkit-scrollbar-thumb{background:var(--line-strong);border-radius:20px}
+ #permissionPicker .permission-picker-list::-webkit-scrollbar-track{background:transparent}
+ #permissionPicker .dialog-heading,#permissionPicker .permission-picker-search{min-width:0;width:100%;flex-shrink:0}
+ #permissionPicker::backdrop{background:#15243c66;backdrop-filter:blur(5px)}
+}
+@media(max-width:700px){.permission-picker[open]{width:calc(100vw - 20px)!important;max-height:85dvh!important;height:auto!important;border-radius:18px!important}.permission-picker .dialog-heading{padding:16px}.permission-picker .dialog-heading h2{font-size:16px}.permission-folder-option{min-height:66px}.permission-folder-copy strong{font-size:13px}.permission-folder-copy small{font-size:11px}}
+/* Permission list: compact cards on phones, aligned table on desktop. */
+.settings-card:has(.permissions-table) .settings-card-heading{align-items:center;gap:12px}
+.settings-card:has(.permissions-table) .settings-card-heading>div{min-width:0;flex:1}
+.settings-card:has(.permissions-table) .settings-card-heading h3{font-size:14px;line-height:1.5}
+.permissions-table .principal>div{min-width:0}
+.permissions-table .role-static{background:var(--brand-soft);color:var(--brand-ink);border-color:transparent;font-weight:600}
+.permissions-table .permission-source{color:var(--muted)}
+.permissions-table .inherit-origin{display:inline-flex;align-items:center;gap:5px}
+@media(max-width:700px){
+ .settings-card:has(.permissions-table){padding:16px}
+ .settings-card:has(.permissions-table) .settings-card-heading{margin-bottom:14px}
+ .settings-card:has(.permissions-table) .settings-card-heading h3{font-size:13px}
+ .settings-card:has(.permissions-table) .settings-card-heading p{font-size:10px;margin-top:4px}
+ .settings-card:has(.permissions-table) .settings-card-heading>.btn{min-height:42px;font-size:11px;padding:9px 10px;gap:5px}
+ .permissions-table,.permissions-table tbody{display:block;width:100%}
+ .permissions-table tbody{display:grid;gap:10px}
+ .permissions-table tr{display:grid;grid-template-columns:minmax(0,1fr) auto 24px;gap:6px 8px;padding:12px!important;border:1px solid var(--line)!important;border-radius:12px;background:var(--surface-soft)}
+ .permissions-table td{display:block;padding:0!important;border:0!important;min-width:0}
+ .permissions-table td:nth-child(1){grid-column:1;grid-row:1}
+ .permissions-table td:nth-child(2){grid-column:2;grid-row:1;padding:0!important;align-self:center}
+ .permissions-table td:nth-child(3){grid-column:1/-1;grid-row:2;padding-left:40px!important;display:flex;align-items:center;flex-wrap:wrap;gap:4px 8px}
+ .permissions-table td:last-child{grid-column:3;grid-row:1;display:flex;justify-content:center;align-items:center}
+ .permissions-table .principal{gap:9px;align-items:center}
+ .permissions-table .principal strong{font-size:12px;font-weight:600;line-height:1.5}
+ .permissions-table .principal small{font-size:10px;margin-top:2px}
+ .permissions-table .principal-symbol{background:var(--surface);border:1px solid var(--line);width:31px;height:31px}
+ .permissions-table .role-static{padding:4px 8px;font-size:10px;line-height:1.5;border-radius:6px}
+ .permissions-table .role-select{max-width:112px;width:112px;min-height:44px!important;font-size:16px;background:var(--surface)}
+ .permissions-table .inherit-origin{font-size:10px;min-height:26px;padding:2px 0;max-width:none}
+ .permissions-table .permission-source{font-size:10px;margin:0;max-width:100%;white-space:normal;overflow-wrap:anywhere}
+ .permissions-table td:last-child .icon-btn{width:28px;min-height:44px}
+ .settings-card:has(.permissions-table) .principal-caption{font-size:10px;line-height:1.7;margin-top:14px}
+ .permission-chips{gap:6px}.permission-chip{border-radius:6px;padding:6px 8px}
+}
+@media(max-width:380px){.permissions-table tr{grid-template-columns:minmax(0,1fr) 24px}.permissions-table td:nth-child(2){grid-column:1;grid-row:2;padding-left:40px!important}.permissions-table td:nth-child(3){grid-row:3}.permissions-table td:last-child{grid-column:2;grid-row:1}}
+  </style>
   <style>
 /* Studio design system: touch-first controls, local overflow, accessible contrast. */
 :root{--studio-navy:#101c32;--studio-blue:#3269ed;--studio-paper:#fff}
@@ -1549,7 +1624,7 @@ body.auth-locked{overflow:hidden}
 <div class="app" id="app">
   <aside class="sidebar" id="sidebar" aria-label="Điều hướng thư mục">
     <div class="brand-row">
-      <a class="brand" href="#folder=all" data-action="navigate" data-id="all" aria-label="DocHub — Tất cả tài liệu">
+      <a class="brand" href="/" data-action="navigate" data-id="all" aria-label="DocHub — Tất cả tài liệu">
         <span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 36 40"><path d="M5 2h15l12 11v14L20 38H5V2Z" fill="currentColor"/><path d="M13 11h7l5 5v8l-5 5h-7V11Z" fill="white"/><path d="M5 2h8v27l-8 9V2Z" fill="#79a4ff"/></svg></span>
         <span><strong>DocHub<span class="brand-dot">.</span></strong><small>WORKSPACE</small></span>
       </a>
@@ -1593,6 +1668,8 @@ body.auth-locked{overflow:hidden}
   <div class="settings-layout"><nav id="settingsNav" class="settings-nav" aria-label="Các mục cài đặt"></nav><section id="settingsContent" class="settings-content" aria-live="polite"></section></div>
 </dialog>
 <dialog id="formDialog" class="form-dialog" aria-labelledby="formTitle"></dialog>
+<dialog id="filterSheet" class="filter-sheet" aria-labelledby="filterSheetTitle"></dialog>
+<dialog id="permissionPicker" class="form-dialog permission-picker" aria-labelledby="permissionPickerTitle"></dialog>
 <dialog id="confirmDialog" class="confirm-dialog" aria-labelledby="confirmTitle"></dialog>
 <dialog id="previewDialog" class="preview-dialog" aria-labelledby="previewTitle"></dialog>
 <noscript><div class="noscript">Vui lòng bật JavaScript để dùng bản mẫu DocHub.</div></noscript>
@@ -2362,6 +2439,11 @@ window.DocHubMedia={init,open,typeOf,getSession:()=>session};
     const extensions=[...new Set(state.documents.filter(active).map(d=>d.ext).filter(Boolean))].sort();
     return `<details id="advancedSearch" class="search-filters" ${ui.filtersOpen?'open':''}><summary>${icon('sort')}<span>Bộ lọc nâng cao</span>${count?`<span class="search-filter-count">${count} điều kiện</span>`:''}${icon('down','tiny search-filter-chevron')}</summary><div class="search-filter-body"><div class="search-filter-grid">${select('scope','Phạm vi tìm kiếm', [['','Thư mục hiện tại'],['descendants','Gồm thư mục con'],['all','Toàn không gian đã tải']])}${select('ext','Định dạng tài liệu',[['','Tất cả định dạng'],...extensions.map(ext=>[ext,ext.toUpperCase()])])}${select('owner','Người tạo',[['','Tất cả người tạo'],...state.users.map(u=>[u.id,u.name])])}<fieldset class="search-filter-field"><legend>Khoảng cập nhật</legend><div class="search-filter-range">${input('from','Cập nhật từ','date')}<span aria-hidden="true">–</span>${input('to','Cập nhật đến','date')}</div></fieldset><fieldset class="search-filter-field"><legend>Dung lượng · MB</legend><div class="search-filter-range">${input('min','Dung lượng tối thiểu (MB)','number')}<span aria-hidden="true">–</span>${input('max','Dung lượng tối đa (MB)','number')}</div></fieldset><div class="search-filter-field"><span class="search-filter-label">Trạng thái</span><label class="search-filter-pin"><input type="checkbox" data-search-filter="pinned" ${f.pinned?'checked':''}>${icon('pin')}<span>Chỉ mục đã ghim</span></label></div></div><div class="search-filter-footer"><p class="search-filter-hint">Tìm tên và mô tả · <strong>"cụm từ"</strong> để tìm liền nhau, <strong>-từ</strong> để loại trừ. Chưa tìm nội dung PDF/Office; chỉ tìm dữ liệu đã tải.</p><div class="search-filter-actions"><button class="btn sm ghost" data-action="reset-filters">Xóa bộ lọc</button><button class="btn sm" data-action="save-filters">${icon('check','tiny')}Lưu bộ lọc</button>${state.preferences.savedSearchFilter?'<button class="btn sm search-filter-restore" data-action="restore-filters">Áp dụng bộ lọc đã lưu</button>':''}</div></div></div></details>`;
   }
+  function renderFilterSheet() {
+    const sheet=$('#filterSheet'),template=document.createElement('template');
+    template.innerHTML=advancedFilters();
+    sheet.innerHTML=`<div class="filter-sheet-handle" aria-hidden="true"></div><header class="filter-sheet-heading"><div><h2 id="filterSheetTitle">Bộ lọc tìm kiếm</h2><p>Thu hẹp kết quả theo nhu cầu của bạn</p></div><button class="icon-btn" data-action="close-dialog" data-dialog="filterSheet" aria-label="Đóng bộ lọc">${icon('close')}</button></header><div class="filter-sheet-content">${template.content.querySelector('.search-filter-body').outerHTML}</div><footer class="filter-sheet-footer"><button class="btn primary" data-action="close-dialog" data-dialog="filterSheet">Xem kết quả</button></footer>`;
+  }
   function visibleItems() {
     let items=scopedItems();
     if(ui.tab==='files')items=items.filter(item=>item.kind==='file');
@@ -2500,6 +2582,8 @@ window.DocHubMedia={init,open,typeOf,getSession:()=>session};
         </section>
         <div class="drop-zone" id="dropZone">${icon('upload')}<div>Kéo thả tài liệu vào đây hoặc <button data-action="upload">chọn từ thiết bị</button><small>Mọi định dạng: ảnh, video, PDF, Excel, Word, ZIP... · Tối đa 250 MB/tệp</small></div></div>
         <div class="workspace-tip"><span>${icon('sparkles')}Mọi thứ gọn gàng. Mọi tài liệu đúng chỗ.</span><span>${icon('info')}Phân quyền: Ảnh đại diện → Cài đặt.</span></div>`;
+      const searchHost=$('#workspace .filter-search');
+      if(searchHost){const filterButton=document.createElement('button');filterButton.className=`mobile-filter-button ${Object.values(ui.filters).some(Boolean)?'active':''}`;filterButton.dataset.action='open-filters';filterButton.setAttribute('aria-label','Mở bộ lọc nâng cao');filterButton.setAttribute('aria-haspopup','dialog');filterButton.innerHTML='<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16l-6 7v6l-4 2v-8z"/></svg>';searchHost.append(filterButton);}
       const selectAll=$('#selectAll');
       if(selectAll)selectAll.indeterminate=pageItems.some(item=>ui.selected.has(item.id))&&!pageItems.every(item=>ui.selected.has(item.id));
     });
@@ -2522,7 +2606,8 @@ window.DocHubMedia={init,open,typeOf,getSession:()=>session};
     const me=user('u1');
     if(me) {
       $('.profile-copy strong').textContent=me.name;
-      $('.profile-avatar').textContent=initials(me.name);
+      const profileAvatar=$('.profile-avatar');
+      if(!profileAvatar.style.backgroundImage)profileAvatar.textContent=initials(me.name);
       $('.profile-button').setAttribute('aria-label',`Tài khoản ${me.name}`);
     }
   }
@@ -2533,7 +2618,12 @@ window.DocHubMedia={init,open,typeOf,getSession:()=>session};
     ui.folder=id;ui.query='';ui.localQuery='';ui.page=1;ui.tab='all';ui.selected.clear();
     $('#globalSearch').value='';
     for(const ancestor of ancestorIds(id))ui.expanded.add(ancestor);
-    if(push)try{history.pushState({folder:id},'',`#folder=${encodeURIComponent(id)}`);}catch(error){}
+    if(push) {
+      try {
+        const cleanUrl = (id === 'all') ? (window.location.pathname || '/') : `?folder=${encodeURIComponent(id)}`;
+        history.pushState({folder:id}, '', cleanUrl);
+      } catch(error) {}
+    }
     saveState();renderAll();
     if($('#navDialog').open)$('#navDialog').close();
     document.title=`${folder(id).name} — DocHub`;
@@ -2558,8 +2648,9 @@ window.DocHubMedia={init,open,typeOf,getSession:()=>session};
     const parent=folder(current.parentId);
     const hasParent=!!parent;
     return `${sectionHeader('Phân quyền truy cập','Chọn thư mục, thêm người hoặc nhóm và thiết lập vai trò phù hợp.')}
-      <div class="folder-select-panel"><span class="heading-symbol">${icon('folder-open')}</span><div class="field"><label for="permissionFolder">THƯ MỤC ĐANG THIẾT LẬP</label><select id="permissionFolder" aria-label="Thư mục cần phân quyền">${folderOptions(current.id)}</select></div><span class="badge blue">${rules.length} quyền</span></div>
+      <div class="folder-select-panel"><span class="heading-symbol">${icon('folder-open')}</span><div class="field"><span class="field-label">THƯ MỤC ĐANG THIẾT LẬP</span><button class="permission-folder-trigger" data-action="pick-permission-folder" aria-haspopup="dialog"><span><strong>${e(current.name)}</strong><small>${e(current.parentId?fullPath(current.parentId):'Thư mục gốc')}</small></span>${icon('down','tiny')}</button></div><span class="badge blue">${rules.length} quyền</span></div>
       <div class="inheritance-row ${current.inherit?'':'off'}"><span class="inheritance-icon">${icon(current.inherit?'link':'lock')}</span><div class="inheritance-copy"><strong>${hasParent?'Kế thừa quyền từ thư mục cha':'Quyền tại thư mục gốc'}</strong><p>${!hasParent?'Thư mục gốc không có quyền kế thừa.':current.inherit?`Đang kế thừa từ <button class="text-button" data-action="permission-parent" data-id="${e(parent.id)}">${e(parent.name)}</button>. Quyền riêng được cộng thêm.`:'Quyền riêng đang được áp dụng. Không nhận quyền từ thư mục cha.'}</p></div><button class="switch" role="switch" aria-checked="${!!current.inherit}" aria-label="Kế thừa quyền từ thư mục cha" data-action="toggle-inheritance" ${!hasParent?'disabled':''}></button></div>
+      ${window.DocHubAPI?.connected&&['owner','admin'].includes(window.DocHubAPI.organization?.role)?`<section class="settings-card"><h3>Đồng bộ quyền Google Drive</h3><p class="principal-caption">Chỉ chia sẻ theo email đã cấp quyền. Writer cho phép sửa trực tiếp ngoài DocHub. Quyền Drive cấp thủ công không được tự thu hồi.</p><button class="btn sm" data-action="enable-drive-sharing">${state.preferences.driveSharingEnabled?'Thử đồng bộ lại quyền Drive':'Bật đồng bộ quyền Drive'}</button></section>`:''}
       <section class="settings-card">
         <div class="settings-card-heading"><div><h3>Người và nhóm có quyền truy cập</h3><p>${rules.length} thiết lập quyền tại thư mục này</p></div><button class="btn primary sm" data-action="add-access">${icon('plus')}Thêm quyền</button></div>
         ${rules.length?`<table class="permissions-table"><thead><tr><th scope="col">Đối tượng</th><th scope="col">Vai trò</th><th scope="col">Nguồn quyền</th><th scope="col"><span class="visually-hidden">Thu hồi</span></th></tr></thead><tbody>${rules.map(rule=>`<tr><td>${principalMarkup(rule)}</td><td>${rule.inherited?`<span class="role-static">${e(ROLES[rule.role].label)}</span>`:`<select class="role-select" data-acl-role="${e(rule.id)}" aria-label="Vai trò của ${e(principalName(rule))}">${rolesOptions(rule.role)}</select>`}</td><td>${rule.inherited?`<button class="inherit-origin" data-action="permission-parent" data-id="${e(rule.sourceId)}">Kế thừa ${icon('link','tiny')}</button><span class="permission-source">${e(folder(rule.sourceId)?.name)}</span>`:`<span class="badge blue">Quyền riêng</span>`}</td><td>${rule.inherited?`<span class="muted" title="Chỉnh sửa tại thư mục nguồn">${icon('lock','tiny')}</span>`:`<button class="icon-btn small" data-action="revoke-access" data-id="${e(rule.id)}" aria-label="Thu hồi quyền ${e(principalName(rule))}" title="Thu hồi quyền">${icon('close')}</button>`}</td></tr>`).join('')}</tbody></table>`:
@@ -2574,6 +2665,16 @@ window.DocHubMedia={init,open,typeOf,getSession:()=>session};
       </section>
       <div class="info-callout">${icon('shield')}<span>Khi đăng nhập Cloud, Supabase RLS kiểm tra quyền bằng danh tính thật trước mọi thao tác tệp. JavaScript chỉ hiển thị kết quả và không thể tự cấp thêm quyền.</span></div>
       <p class="settings-footnote" style="margin-top:14px">${icon('check')}Thay đổi thành viên, nhóm và ACL được đồng bộ vào mô hình phân quyền của tổ chức.</p>`;
+  }
+  function renderPermissionPickerList(query='') {
+    const q=normalize(query.trim()),items=activeFolders().filter(f=>normalize(fullPath(f.id)).includes(q)).sort((a,b)=>fullPath(a.id).localeCompare(fullPath(b.id),'vi'));
+    $('#permissionPickerList').innerHTML=items.length?items.map(f=>`<button class="permission-folder-option ${f.id===ui.permissionFolder?'selected':''}" data-action="choose-permission-folder" data-id="${e(f.id)}" aria-pressed="${f.id===ui.permissionFolder}"><span class="principal-symbol">${icon(f.id==='all'?'building':'folder')}</span><span class="permission-folder-copy"><strong>${e(f.name)}</strong><small>${e(f.parentId?fullPath(f.parentId):'Thư mục gốc')}</small></span>${f.id===ui.permissionFolder?icon('check','tiny'):icon('chevron','tiny')}</button>`).join(''):'<p class="permission-picker-empty" role="status">Không tìm thấy thư mục. Thử tên phòng ban hoặc thư mục cha.</p>';
+    $('#permissionPickerCount').textContent=`${items.length} thư mục`;
+  }
+  function openPermissionPicker() {
+    $('#permissionPicker').innerHTML=`<header class="dialog-heading"><div class="dialog-heading-copy"><span class="heading-symbol">${icon('folder-open')}</span><span><h2 id="permissionPickerTitle">Chọn thư mục phân quyền</h2><p>Tìm theo tên thư mục hoặc phòng ban</p></span></div><button class="icon-btn" data-action="close-dialog" data-dialog="permissionPicker" aria-label="Đóng chọn thư mục">${icon('close')}</button></header><div class="permission-picker-search"><div class="filter-search">${icon('search')}<input id="permissionPickerSearch" type="search" placeholder="Tìm thư mục, phòng ban…" aria-label="Tìm thư mục phân quyền" autocomplete="off"></div><span id="permissionPickerCount" aria-live="polite"></span></div><div id="permissionPickerList" class="permission-picker-list" aria-label="Danh sách thư mục"></div>`;
+    renderPermissionPickerList();showDialog('permissionPicker');
+    $('#permissionPickerList .selected')?.scrollIntoView({block:'nearest'});
   }
   function usersPage() {
     const q=normalize(ui.settingsQuery);
@@ -3134,7 +3235,7 @@ function openHelp() {
             sessionFiles.clear();state=createSeed();upgradeSamples();
             ui.folder='training';ui.permissionFolder='salary';ui.inspectUser='u2';ui.query='';ui.localQuery='';ui.treeQuery='';ui.settingsQuery='';ui.selected.clear();ui.expanded=new Set(['hr']);ui.page=1;ui.tab='all';ui.settings='general';
             $('#globalSearch').value='';$('#treeSearch').value='';
-            try{history.replaceState({},'','#folder=training');}catch(error){}
+            try{history.replaceState({folder:'training'},'','?folder=training');}catch(error){}
             saveState();renderAll();renderSettings();toast('Đã khôi phục dữ liệu mẫu ban đầu.');
           }});break;
         case 'restore-item':restoreRoot(id);break;
@@ -3176,9 +3277,13 @@ function openHelp() {
         case 'preview-tab':await openPreview(ui.previewId,target.dataset.tab);break;
         case 'tab':ui.tab=target.dataset.tab;ui.page=1;ui.selected.clear();renderWorkspace();break;
         case 'view':state.preferences.view=target.dataset.view;saveState();renderWorkspace();break;
-        case 'reset-filters':ui.filters={};ui.localQuery='';ui.page=1;ui.selected.clear();renderWorkspace();break;
-        case 'save-filters':state.preferences.savedSearchFilter={filters:{...ui.filters},query:ui.localQuery};saveState();renderWorkspace();toast('Đã lưu bộ lọc cho tài khoản hiện tại.');break;
-        case 'restore-filters':if(state.preferences.savedSearchFilter){ui.filters={...state.preferences.savedSearchFilter.filters};ui.localQuery=state.preferences.savedSearchFilter.query||'';ui.page=1;ui.selected.clear();renderWorkspace();}break;
+        case 'enable-drive-sharing':confirmAction({title:'Đồng bộ quyền sang Google Drive?',description:'Kiểm tra email nhân viên trước khi tiếp tục. Người có quyền Biên tập trở lên sẽ có Writer và có thể sửa ngoài DocHub. Đồng bộ áp dụng cho tệp do tài khoản này tải lên; tài khoản khác cần tự đồng bộ tệp của mình.',label:'Xác nhận đồng bộ',onConfirm:async()=>{state.preferences.driveSharingEnabled=true;saveState();await window.DocHubAPI.flush();renderSettings();}});break;
+        case 'pick-permission-folder':openPermissionPicker();break;
+        case 'choose-permission-folder':if(active(folder(id))){ui.permissionFolder=id;closeDialog('permissionPicker');renderSettings();}break;
+        case 'open-filters':renderFilterSheet();showDialog('filterSheet');break;
+        case 'reset-filters':ui.filters={};ui.localQuery='';ui.page=1;ui.selected.clear();renderWorkspace();if($('#filterSheet').open)renderFilterSheet();break;
+        case 'save-filters':state.preferences.savedSearchFilter={filters:{...ui.filters},query:ui.localQuery};saveState();renderWorkspace();if($('#filterSheet').open)renderFilterSheet();toast('Đã lưu bộ lọc cho tài khoản hiện tại.');break;
+        case 'restore-filters':if(state.preferences.savedSearchFilter){ui.filters={...state.preferences.savedSearchFilter.filters};ui.localQuery=state.preferences.savedSearchFilter.query||'';ui.page=1;ui.selected.clear();renderWorkspace();if($('#filterSheet').open)renderFilterSheet();}break;
         case 'sort-menu':
           showMenu(target,`<p class="menu-label">SẮP XẾP THEO</p>${[['updated','Cập nhật mới nhất'],['oldest','Cập nhật cũ nhất'],['name','Tên từ A đến Z'],['size','Dung lượng giảm dần']].map(([key,label])=>`<button class="menu-item" data-action="sort" data-sort="${key}">${icon('sort')}${e(label)}${state.preferences.sort===key?icon('check'):''}</button>`).join('')}`);break;
         case 'sort':state.preferences.sort=target.dataset.sort;ui.page=1;saveState();renderWorkspace();break;
@@ -3212,7 +3317,8 @@ function openHelp() {
   document.addEventListener('toggle',event=>{if(event.target.id==='advancedSearch')ui.filtersOpen=event.target.open;},true);
   document.addEventListener('input',event=>{
     const target=event.target;
-    if(target.id==='treeSearch') {ui.treeQuery=target.value;renderTree();}
+    if(target.id==='permissionPickerSearch')renderPermissionPickerList(target.value);
+    else if(target.id==='treeSearch') {ui.treeQuery=target.value;renderTree();}
     else if(target.id==='globalSearch') {
       clearTimeout(globalSearchTimer);
       const value=target.value;
@@ -3328,9 +3434,28 @@ function openHelp() {
   }
   mobileMedia.addEventListener('change',syncNavigation);
   matchMedia('(prefers-color-scheme: dark)').addEventListener('change',()=>{if(state.preferences.theme==='system')applyPreferences();});
-  window.addEventListener('popstate',()=>{
-    const id=new URLSearchParams(location.hash.slice(1)).get('folder');
-    if(id&&active(folder(id)))navigate(id,false);
+  function getFolderFromUrl() {
+    try {
+      const searchParams = new URLSearchParams(window.location.search);
+      const queryFolder = searchParams.get('folder');
+      if (queryFolder) return queryFolder;
+      if (window.location.hash) {
+        const hash = window.location.hash.replace(/^#\/?/, '');
+        const hashParams = new URLSearchParams(hash);
+        const hashFolder = hashParams.get('folder');
+        if (hashFolder) return hashFolder;
+        if (hash && hash !== 'workspace' && !hash.startsWith('i-')) return hash;
+      }
+    } catch (e) {}
+    return null;
+  }
+  window.addEventListener('popstate', event => {
+    const id = event.state?.folder || getFolderFromUrl() || 'all';
+    if(window.location.hash) {
+      const cleanUrl = (id === 'all') ? (window.location.pathname || '/') : `?folder=${encodeURIComponent(id)}`;
+      try { history.replaceState({folder: id}, '', cleanUrl); } catch(e) {}
+    }
+    if(id && active(folder(id))) navigate(id, false);
   });
   window.addEventListener('storage',event=>{
     if(event.key===stateStorageKey())toast('Dữ liệu của tài khoản này đã thay đổi ở tab khác. Tải lại trang trước khi tiếp tục chỉnh sửa.','warning');
@@ -3411,10 +3536,14 @@ function openHelp() {
     fullPath:id=>fullPath(id)
   });
   try {
-    const requested=new URLSearchParams(location.hash.slice(1)).get('folder');
-    if(requested&&active(folder(requested)))ui.folder=requested;
-    if(!active(folder(ui.folder)))ui.folder='all';
-    ancestorIds(ui.folder).forEach(id=>ui.expanded.add(id));
+    const requested = getFolderFromUrl();
+    if(requested && active(folder(requested))) ui.folder = requested;
+    if(!active(folder(ui.folder))) ui.folder = 'all';
+    ancestorIds(ui.folder).forEach(id => ui.expanded.add(id));
+    if (window.location.hash) {
+      const cleanUrl = (ui.folder === 'all') ? (window.location.pathname || '/') : `?folder=${encodeURIComponent(ui.folder)}`;
+      try { history.replaceState({folder: ui.folder}, '', cleanUrl); } catch(e) {}
+    }
     syncNavigation();renderAll();saveState();
     document.title=`${folder(ui.folder).name} — DocHub`;
     if(storageWarning)setTimeout(()=>toast(storageWarning,'warning'),350);

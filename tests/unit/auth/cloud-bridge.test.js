@@ -46,7 +46,8 @@ async function createHarness({ googleEnabled, session }) {
       if (name === 'dochub_can_folder_action') return { data: true, error: null };
       return { data: null, error: null };
     },
-    from: () => ({
+    from: table => ({
+      then(resolve) { return Promise.resolve({data:table==='organization_folders'?[{folder_uid:'all',parent_uid:null,name:'Root',deleted_at:null}]:[],error:null}).then(resolve); },
       select() { return this; },
       eq() { return this; },
       maybeSingle: async () => ({ data: null, error: null }),
@@ -85,6 +86,8 @@ async function createHarness({ googleEnabled, session }) {
       },
       supabase: { createClient: () => client },
       DocHubDrive: {
+        getOrCreateMirroredFolder: async token => {calls.drive+=1;assert.strictEqual(token,'provider-token');return {id:'drive-folder-id'};},
+        reconcileFolder: async () => ({id:'drive-folder-id'}),
         getOrCreateAppFolder: async token => {
           calls.drive += 1;
           assert.strictEqual(token, 'provider-token');

@@ -197,14 +197,24 @@ const authUiScript = `
         if (strong) strong.textContent = name;
         if (small) small.textContent = email;
         if (av) {
+          const fallback = String(name || 'U').split(/\\s+/).filter(Boolean).map(part => part[0]).slice(-2).join('').toUpperCase();
           if (avatarUrl) {
-            av.style.backgroundImage = \`url('\${avatarUrl}')\`;
+            av.dataset.avatarUrl = avatarUrl;
+            av.style.backgroundImage = 'url(' + JSON.stringify(avatarUrl) + ')';
             av.style.backgroundSize = 'cover';
             av.style.backgroundPosition = 'center';
             av.textContent = '';
+            const image = new Image();
+            image.onerror = () => {
+              if (av.dataset.avatarUrl !== avatarUrl) return;
+              av.style.backgroundImage = '';
+              av.textContent = fallback;
+            };
+            image.src = avatarUrl;
           } else {
+            delete av.dataset.avatarUrl;
             av.style.backgroundImage = '';
-            av.textContent = String(name || 'U').split(/\\s+/).map(part => part[0]).slice(-2).join('').toUpperCase();
+            av.textContent = fallback;
           }
         }
       }
