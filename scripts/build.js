@@ -98,16 +98,65 @@ if (html.includes(oldAccountCase)) {
 const authUiScript = `
   // Tự động cập nhật giao diện khi trạng thái đăng nhập thay đổi
   (async () => {
-    if (!window.DocHubAPI) return;
     const api = window.DocHubAPI;
     const dot = document.getElementById('cloudStatusDot');
     const statusText = document.getElementById('cloudStatusText');
     const statusBadge = document.getElementById('cloudStatusBadge');
     const profileBtn = document.querySelector('.profile-button');
+    const authScreen = document.getElementById('authScreen');
+    const loginButton = document.getElementById('loginGoogleButton');
+    const loginButtonText = document.getElementById('loginGoogleText');
+    const loginStatus = document.getElementById('loginStatus');
+    const app = document.getElementById('app');
+
+    function lockWorkspace(locked) {
+      document.body.classList.toggle('auth-locked', locked);
+      if (authScreen) authScreen.hidden = !locked;
+      if (app) {
+        app.inert = locked;
+        if (locked) app.setAttribute('aria-hidden', 'true');
+        else app.removeAttribute('aria-hidden');
+      }
+    }
 
     function renderAuthUi() {
+      if (!api) {
+        lockWorkspace(true);
+        if (authScreen) authScreen.setAttribute('aria-busy', 'false');
+        if (loginButton) loginButton.disabled = true;
+        if (loginButtonText) loginButtonText.textContent = 'Không thể kết nối dịch vụ đăng nhập';
+        if (loginStatus) {
+          loginStatus.textContent = 'Hãy kiểm tra kết nối mạng và tải lại trang.';
+          loginStatus.classList.add('is-error');
+        }
+        return;
+      }
+
       const connected = api.connected && api.user;
       const driveConnected = connected && api.isDriveConnected;
+      const busy = ['checking', 'redirecting', 'connecting_drive', 'signing_out'].includes(api.authStatus);
+      const needsConfig = api.authStatus === 'configuration_required' || api.googleProviderEnabled === false;
+
+      lockWorkspace(!connected);
+      if (authScreen) authScreen.setAttribute('aria-busy', busy ? 'true' : 'false');
+      if (loginButton) {
+        loginButton.disabled = busy || needsConfig;
+        loginButton.classList.toggle('is-busy', busy);
+      }
+      if (loginButtonText) {
+        loginButtonText.textContent = api.authStatus === 'redirecting' ? 'Đang chuyển đến Google…' :
+          api.authStatus === 'checking' ? 'Đang kiểm tra phiên đăng nhập…' :
+          api.authStatus === 'signing_out' ? 'Đang đăng xuất…' :
+          needsConfig ? 'Google OAuth chưa được cấu hình' :
+          api.authStatus === 'error' || api.authStatus === 'unavailable' ? 'Thử đăng nhập lại với Google' :
+          'Tiếp tục với Google';
+      }
+      if (loginStatus) {
+        loginStatus.classList.toggle('is-error', needsConfig || api.authStatus === 'error' || api.authStatus === 'unavailable');
+        loginStatus.textContent = busy ? 'Vui lòng chờ trong giây lát.' :
+          needsConfig ? 'Quản trị viên cần bật Google Provider trong Supabase.' :
+          api.authError || 'Dùng tài khoản Google đã được tổ chức của bạn cho phép.';
+      }
 
       if (statusBadge) {
         statusBadge.style.display = '';
@@ -143,8 +192,31 @@ const authUiScript = `
       }
     }
 
+    if (loginButton) {
+      loginButton.addEventListener('click', async () => {
+        if (!api?.loginWithGoogle) return;
+        try {
+          loginButton.disabled = true;
+          loginButton.classList.add('is-busy');
+          if (loginButtonText) loginButtonText.textContent = 'Đang chuyển đến Google…';
+          if (loginStatus) {
+            loginStatus.textContent = 'Một cửa sổ đăng nhập an toàn sắp được mở.';
+            loginStatus.classList.remove('is-error');
+          }
+          await api.loginWithGoogle();
+        } catch (error) {
+          if (loginStatus) {
+            loginStatus.textContent = error?.message || 'Không thể bắt đầu đăng nhập Google.';
+            loginStatus.classList.add('is-error');
+          }
+          renderAuthUi();
+        }
+      });
+    }
+
     document.addEventListener('dochub:auth', renderAuthUi);
     renderAuthUi();
+    if (!api) return;
     await api.ready;
     renderAuthUi();
   })();

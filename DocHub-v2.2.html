@@ -154,12 +154,6 @@ svg.icon.tiny{width:15px;height:15px}
 .tree-group .tree-group::before{content:"";position:absolute;left:calc(18px + var(--parent-level,0)*18px);top:3px;bottom:11px;border-left:1px solid var(--line)}
 .tree-empty{padding:25px 12px;color:var(--muted);font-size:12px;text-align:center}
 .sidebar-bottom{padding:13px 18px 15px;flex-shrink:0;border-top:1px solid var(--line)}
-.local-note{padding:9px 2px 15px;display:flex;align-items:center;gap:10px}
-.local-note-icon{width:32px;height:32px;display:grid;place-items:center;background:var(--green-soft);border-radius:9px;color:var(--green)}
-.local-note-icon .icon{width:17px;height:17px}
-.local-note strong{font-size:10.5px;display:block;color:var(--text);font-weight:550}
-.local-note small{display:block;font-size:10px;color:var(--subtle);margin-top:2px}
-.local-note>.status-dot{margin-left:auto;width:5px;height:5px}
 .settings-launch{display:flex;align-items:center;gap:10px;border-radius:8px;width:100%;padding:11px 10px;text-align:left;font-size:12px;font-weight:550}
 .settings-launch:hover{background:var(--surface-hover)}
 .settings-launch>.icon{color:var(--muted);width:19px;height:19px}
@@ -280,9 +274,6 @@ svg.icon.tiny{width:15px;height:15px}
 .workspace-tip{margin-top:17px;display:flex;justify-content:space-between;gap:16px;font-size:10px;color:var(--subtle);padding:0 3px}
 .workspace-tip>span{display:flex;align-items:center;gap:7px}
 .workspace-tip .icon{width:13px;height:13px}
-.workspace-footer{padding:12px 34px 20px;display:flex;justify-content:space-between;gap:15px;font-size:9.5px;color:var(--subtle)}
-.workspace-footer>span{display:flex;align-items:center;gap:7px}
-.workspace-footer .text-button{color:var(--muted);font-size:9.5px;font-weight:450}
 .empty-state{padding:65px 20px;text-align:center}
 .empty-symbol{width:64px;height:64px;display:grid;place-items:center;border-radius:20px;background:var(--brand-soft);color:var(--brand);margin:0 auto 20px}
 .empty-symbol .icon{width:29px;height:29px;stroke-width:1.4}
@@ -1328,9 +1319,77 @@ html{scroll-padding-top:calc(var(--cf-top) + 64px)}
 @media(prefers-reduced-motion:reduce){.cf-mini,.cf-folder-header{transition:none;animation:none}}
 @media print{.cf-mini,.cf-back,.cf-folder-menu,.cf-view-toggle,#mDock{display:none!important}.cf-folder-header{margin-bottom:15px}.cf-hero .hero-folder{display:none}}
 
+/* Authentication gateway */
+body.auth-locked{overflow:hidden}
+.auth-screen{position:fixed;inset:0;z-index:9999;display:grid;grid-template-columns:minmax(430px,1.08fr) minmax(420px,.92fr);min-height:100vh;min-height:100dvh;background:#f4f7fc;color:#34435d}
+.auth-screen[hidden]{display:none!important}
+.auth-showcase{position:relative;overflow:hidden;display:flex;flex-direction:column;justify-content:space-between;padding:clamp(34px,5vw,70px);background:linear-gradient(145deg,#0e2146 0%,#173b7a 56%,#285fd7 100%);color:#fff}
+.auth-showcase::before,.auth-showcase::after{content:"";position:absolute;border-radius:50%;pointer-events:none}
+.auth-showcase::before{width:520px;height:520px;right:-235px;top:-210px;background:radial-gradient(circle,#7fa6ff55 0%,#7fa6ff00 68%)}
+.auth-showcase::after{width:430px;height:430px;left:-230px;bottom:-245px;border:1px solid #ffffff20;box-shadow:0 0 0 62px #ffffff0a,0 0 0 124px #ffffff08}
+.auth-brand{position:relative;z-index:1;display:flex;align-items:center;gap:12px;width:max-content;color:#fff}
+.auth-brand-mark{width:38px;height:43px;display:block}
+.auth-brand-mark svg{width:100%;height:100%}
+.auth-brand-copy strong{display:block;font-size:28px;line-height:1;font-weight:750;letter-spacing:-1px;color:#fff}
+.auth-brand-copy small{display:block;margin-top:6px;font-size:9px;font-weight:700;letter-spacing:3px;color:#b8ccf8}
+.auth-showcase-main{position:relative;z-index:1;max-width:600px;margin:48px 0}
+.auth-eyebrow{display:inline-flex;align-items:center;gap:8px;margin-bottom:22px;padding:7px 11px;border:1px solid #ffffff2e;border-radius:999px;background:#ffffff12;color:#dce7ff;font-size:11px;font-weight:650;letter-spacing:.4px}
+.auth-eyebrow::before{content:"";width:7px;height:7px;border-radius:50%;background:#83e0bc;box-shadow:0 0 0 4px #83e0bc20}
+.auth-showcase h2{max-width:560px;color:#fff;font-size:clamp(35px,4.1vw,60px);line-height:1.06;letter-spacing:-2.4px;font-weight:720}
+.auth-showcase-main>p{max-width:530px;margin-top:22px;color:#c8d8f7;font-size:16px;line-height:1.75}
+.auth-benefits{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-top:35px}
+.auth-benefit{min-width:0;padding:15px;border:1px solid #ffffff20;border-radius:13px;background:#ffffff0d;backdrop-filter:blur(5px)}
+.auth-benefit-icon{width:33px;height:33px;display:grid;place-items:center;margin-bottom:14px;border-radius:9px;background:#ffffff14;color:#aecdff}
+.auth-benefit-icon .icon{width:17px;height:17px}
+.auth-benefit strong{display:block;color:#fff;font-size:12px;font-weight:650}
+.auth-benefit span{display:block;margin-top:4px;color:#afc3e8;font-size:10.5px;line-height:1.45}
+.auth-showcase-foot{position:relative;z-index:1;display:flex;align-items:center;gap:8px;color:#afc3e8;font-size:11px}
+.auth-showcase-foot .icon{width:15px;height:15px;color:#83e0bc}
+.auth-entry{position:relative;display:grid;place-items:center;padding:clamp(28px,5vw,74px);background:linear-gradient(180deg,#fbfcff 0%,#f3f6fb 100%)}
+.auth-entry::before{content:"";position:absolute;inset:0;background-image:radial-gradient(#9aabc522 .8px,transparent .8px);background-size:22px 22px;mask-image:linear-gradient(to bottom right,#0004,transparent 58%);pointer-events:none}
+.auth-card{position:relative;width:min(100%,455px);padding:42px;border:1px solid #e1e8f2;border-radius:22px;background:#fff;box-shadow:0 28px 80px -38px #17315b66}
+.auth-mobile-brand{display:none}
+.auth-card-badge{display:inline-flex;align-items:center;gap:7px;padding:6px 9px;border-radius:7px;background:#edf3ff;color:#2456c5;font-size:10px;font-weight:700;letter-spacing:.65px;text-transform:uppercase}
+.auth-card-badge .icon{width:14px;height:14px}
+.auth-card h1{margin-top:22px;color:#17243c;font-size:31px;line-height:1.2;letter-spacing:-1.1px;font-weight:720}
+.auth-card-lead{margin-top:11px;color:#687790;font-size:13.5px;line-height:1.65}
+.auth-google{width:100%;min-height:52px;margin-top:29px;display:flex;align-items:center;justify-content:center;gap:11px;padding:12px 16px;border:1px solid #d8e0eb;border-radius:11px;background:#fff;color:#27364f;font-size:13px;font-weight:650;box-shadow:0 4px 12px #20375d0b;transition:transform .15s,border-color .15s,box-shadow .15s,background .15s}
+.auth-google:hover:not(:disabled){transform:translateY(-1px);border-color:#b9c7dc;background:#fbfcff;box-shadow:0 8px 20px #20375d16}
+.auth-google:active:not(:disabled){transform:translateY(0)}
+.auth-google svg{width:20px;height:20px;flex-shrink:0}
+.auth-google .auth-spinner{display:none;width:18px;height:18px;border:2px solid #c9d4e5;border-top-color:#3269ed;border-radius:50%;animation:auth-spin .7s linear infinite}
+.auth-google.is-busy .auth-google-logo{display:none}
+.auth-google.is-busy .auth-spinner{display:block}
+.auth-status{min-height:20px;margin-top:13px;color:#7b899e;font-size:11px;line-height:1.55;text-align:center}
+.auth-status.is-error{padding:9px 10px;border-radius:8px;background:#fff0f1;color:#a23b4b}
+.auth-divider{display:flex;align-items:center;gap:12px;margin:27px 0 20px;color:#9aa5b6;font-size:10px}
+.auth-divider::before,.auth-divider::after{content:"";height:1px;flex:1;background:#e7ecf3}
+.auth-assurance{display:grid;gap:12px}
+.auth-assurance-row{display:flex;align-items:flex-start;gap:10px;color:#65748b;font-size:11px;line-height:1.5}
+.auth-assurance-row .icon{width:16px;height:16px;margin-top:1px;color:#3269ed}
+.auth-legal{margin-top:25px;color:#9aa5b6;font-size:9.5px;line-height:1.55;text-align:center}
+.auth-legal a{color:#60728e;text-decoration:underline;text-underline-offset:2px}
+@keyframes auth-spin{to{transform:rotate(360deg)}}
+@media(max-width:900px){
+ .auth-screen{grid-template-columns:1fr}
+ .auth-showcase{display:none}
+ .auth-entry{padding:28px 20px}
+ .auth-mobile-brand{display:flex;align-items:center;gap:9px;margin-bottom:28px;color:#17243c}
+ .auth-mobile-brand .auth-brand-mark{width:31px;height:35px;color:#3269ed}
+ .auth-mobile-brand strong{font-size:24px;letter-spacing:-.8px}
+ .auth-card{padding:32px}
+}
+@media(max-width:480px){
+ .auth-entry{align-items:start;padding:22px 14px;background:#fff}
+ .auth-card{padding:18px 8px;border:0;box-shadow:none;background:transparent}
+ .auth-card h1{font-size:27px}
+ .auth-mobile-brand{margin-bottom:36px}
+}
+@media(prefers-reduced-motion:reduce){.auth-google{transition:none}.auth-google .auth-spinner{animation-duration:1.4s}}
+
 </style>
 </head>
-<body>
+<body class="auth-locked">
 <a class="skip-link" href="#workspace">Đi tới nội dung chính</a>
 <svg xmlns="http://www.w3.org/2000/svg" class="svg-sprite" aria-hidden="true">
   <symbol id="i-search" viewBox="0 0 24 24"><circle cx="10.8" cy="10.8" r="6.8"/><path d="m16 16 4.5 4.5"/></symbol>
@@ -1381,6 +1440,47 @@ html{scroll-padding-top:calc(var(--cf-top) + 64px)}
 <symbol id="i-rotate" viewBox="0 0 24 24"><path d="M20 8a8 8 0 1 0 0 8M20 3v5h-5"/></symbol>
 <symbol id="i-flip" viewBox="0 0 24 24"><path d="M12 2v20M3 18V6l6 6-6 6ZM21 18V6l-6 6 6 6Z"/></symbol>
 </svg>
+<section class="auth-screen" id="authScreen" aria-labelledby="authTitle" aria-busy="true">
+  <div class="auth-showcase">
+    <div class="auth-brand">
+      <span class="auth-brand-mark" aria-hidden="true"><svg viewBox="0 0 36 40"><path d="M5 2h15l12 11v14L20 38H5V2Z" fill="currentColor"/><path d="M13 11h7l5 5v8l-5 5h-7V11Z" fill="white"/><path d="M5 2h8v27l-8 9V2Z" fill="#79a4ff"/></svg></span>
+      <span class="auth-brand-copy"><strong>DocHub.</strong><small>WORKSPACE</small></span>
+    </div>
+    <div class="auth-showcase-main">
+      <span class="auth-eyebrow">Không gian tri thức doanh nghiệp</span>
+      <h2>Mọi tài liệu quan trọng, luôn đúng chỗ.</h2>
+      <p>Tập trung tài liệu, cộng tác an toàn và kiểm soát quyền truy cập trong một không gian làm việc thống nhất.</p>
+      <div class="auth-benefits">
+        <div class="auth-benefit"><span class="auth-benefit-icon"><svg class="icon"><use href="#i-folder-open"/></svg></span><strong>Tổ chức rõ ràng</strong><span>Cây thư mục linh hoạt cho mọi phòng ban.</span></div>
+        <div class="auth-benefit"><span class="auth-benefit-icon"><svg class="icon"><use href="#i-shield"/></svg></span><strong>Kiểm soát truy cập</strong><span>Dữ liệu được cách ly theo từng tài khoản.</span></div>
+        <div class="auth-benefit"><span class="auth-benefit-icon"><svg class="icon"><use href="#i-link"/></svg></span><strong>Kết nối Drive</strong><span>Lưu tệp trong Google Drive của chính bạn.</span></div>
+      </div>
+    </div>
+    <div class="auth-showcase-foot"><svg class="icon"><use href="#i-lock"/></svg><span>Kết nối bảo mật qua Google OAuth và Supabase</span></div>
+  </div>
+  <div class="auth-entry">
+    <div class="auth-card">
+      <div class="auth-mobile-brand">
+        <span class="auth-brand-mark" aria-hidden="true"><svg viewBox="0 0 36 40"><path d="M5 2h15l12 11v14L20 38H5V2Z" fill="currentColor"/><path d="M13 11h7l5 5v8l-5 5h-7V11Z" fill="white"/><path d="M5 2h8v27l-8 9V2Z" fill="#79a4ff"/></svg></span><strong>DocHub.</strong>
+      </div>
+      <span class="auth-card-badge"><svg class="icon"><use href="#i-shield"/></svg>Đăng nhập an toàn</span>
+      <h1 id="authTitle">Chào mừng trở lại</h1>
+      <p class="auth-card-lead">Đăng nhập để truy cập không gian tài liệu và tiếp tục công việc của bạn.</p>
+      <button class="auth-google is-busy" id="loginGoogleButton" type="button" disabled>
+        <svg class="auth-google-logo" viewBox="0 0 24 24" aria-hidden="true"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/></svg>
+        <span class="auth-spinner" aria-hidden="true"></span>
+        <span id="loginGoogleText">Đang kiểm tra phiên đăng nhập…</span>
+      </button>
+      <p class="auth-status" id="loginStatus" role="status" aria-live="polite">Vui lòng chờ trong giây lát.</p>
+      <div class="auth-divider">Bảo vệ không gian của bạn</div>
+      <div class="auth-assurance">
+        <div class="auth-assurance-row"><svg class="icon"><use href="#i-check"/></svg><span>DocHub chỉ truy cập những tệp do ứng dụng tạo hoặc bạn chủ động chọn.</span></div>
+        <div class="auth-assurance-row"><svg class="icon"><use href="#i-check"/></svg><span>Mỗi tài khoản có vùng dữ liệu riêng được bảo vệ bởi Supabase RLS.</span></div>
+      </div>
+      <p class="auth-legal">Bằng việc tiếp tục, bạn đồng ý sử dụng DocHub theo chính sách bảo mật của tổ chức.</p>
+    </div>
+  </div>
+</section>
 <div class="app" id="app">
   <aside class="sidebar" id="sidebar" aria-label="Điều hướng thư mục">
     <div class="brand-row">
@@ -1395,7 +1495,6 @@ html{scroll-padding-top:calc(var(--cf-top) + 64px)}
     <div class="tree-search-wrap"><svg class="icon"><use href="#i-search"/></svg><input id="treeSearch" type="search" placeholder="Tìm thư mục..." aria-label="Tìm trong cây thư mục" autocomplete="off"></div>
     <nav class="tree-scroll" aria-label="Cây thư mục tài liệu"><div id="folderTree" role="tree" aria-label="Thư mục"></div></nav>
     <div class="sidebar-bottom">
-      <div class="local-note"><span class="local-note-icon"><svg class="icon"><use href="#i-shield"/></svg></span><span><strong>Bản mẫu trên thiết bị</strong><small>Chưa kết nối máy chủ</small></span><span class="status-dot"></span></div>
       <div class="sidebar-footnote"><span>DocHub Studio · v2.2</span><button class="text-button" data-action="help">Trợ giúp <span aria-hidden="true">↗</span></button></div>
     </div>
   </aside>
@@ -1413,7 +1512,6 @@ html{scroll-padding-top:calc(var(--cf-top) + 64px)}
       <button class="profile-button" data-action="account" aria-label="Tài khoản Vũ Ngọc Lan"><span class="avatar profile-avatar">NL</span><span class="profile-copy"><strong>Vũ Ngọc Lan</strong><small>Quản trị viên · Mẫu</small></span><svg class="icon tiny profile-chevron"><use href="#i-down"/></svg></button>
     </header>
     <main id="workspace" class="workspace" tabindex="-1"><div class="boot-message">Đang mở không gian tài liệu...</div></main>
-    <footer class="workspace-footer"><span><span class="status-dot"></span> Dữ liệu mẫu · Lưu cục bộ trên trình duyệt</span><button class="text-button" data-action="help"><svg class="icon tiny"><use href="#i-help"/></svg> Hướng dẫn sử dụng</button></footer>
   </div>
 </div>
 <div id="selectionBar" class="selection-bar" hidden></div>
@@ -2279,11 +2377,6 @@ window.DocHubMedia={init,open,typeOf,getSession:()=>session};
     document.documentElement.dataset.theme=isDark?'dark':'light';
     document.documentElement.dataset.density=state.preferences.density==='compact'?'compact':'comfortable';
     $('#workspaceName').textContent=state.preferences.workspaceName || 'Không gian doanh nghiệp';
-    if(window.DocHubAPI?.connected){
-      $('.local-note strong').textContent='Máy chủ cục bộ';$('.local-note small').textContent='Tệp và thư mục được lưu trên máy';
-      $('.workspace-footer>span').innerHTML='<span class="status-dot"></span> Chế độ thử nghiệm · Chưa có đăng nhập';
-      $('.demo-label').innerHTML='<span></span> Kết nối cục bộ';
-    }
     $('meta[name=theme-color]').content=isDark?'#101722':'#f7f9fc';
     const me=user('u1');
     if(me) {

@@ -154,12 +154,6 @@ svg.icon.tiny{width:15px;height:15px}
 .tree-group .tree-group::before{content:"";position:absolute;left:calc(18px + var(--parent-level,0)*18px);top:3px;bottom:11px;border-left:1px solid var(--line)}
 .tree-empty{padding:25px 12px;color:var(--muted);font-size:12px;text-align:center}
 .sidebar-bottom{padding:13px 18px 15px;flex-shrink:0;border-top:1px solid var(--line)}
-.local-note{padding:9px 2px 15px;display:flex;align-items:center;gap:10px}
-.local-note-icon{width:32px;height:32px;display:grid;place-items:center;background:var(--green-soft);border-radius:9px;color:var(--green)}
-.local-note-icon .icon{width:17px;height:17px}
-.local-note strong{font-size:10.5px;display:block;color:var(--text);font-weight:550}
-.local-note small{display:block;font-size:10px;color:var(--subtle);margin-top:2px}
-.local-note>.status-dot{margin-left:auto;width:5px;height:5px}
 .settings-launch{display:flex;align-items:center;gap:10px;border-radius:8px;width:100%;padding:11px 10px;text-align:left;font-size:12px;font-weight:550}
 .settings-launch:hover{background:var(--surface-hover)}
 .settings-launch>.icon{color:var(--muted);width:19px;height:19px}
@@ -280,9 +274,6 @@ svg.icon.tiny{width:15px;height:15px}
 .workspace-tip{margin-top:17px;display:flex;justify-content:space-between;gap:16px;font-size:10px;color:var(--subtle);padding:0 3px}
 .workspace-tip>span{display:flex;align-items:center;gap:7px}
 .workspace-tip .icon{width:13px;height:13px}
-.workspace-footer{padding:12px 34px 20px;display:flex;justify-content:space-between;gap:15px;font-size:9.5px;color:var(--subtle)}
-.workspace-footer>span{display:flex;align-items:center;gap:7px}
-.workspace-footer .text-button{color:var(--muted);font-size:9.5px;font-weight:450}
 .empty-state{padding:65px 20px;text-align:center}
 .empty-symbol{width:64px;height:64px;display:grid;place-items:center;border-radius:20px;background:var(--brand-soft);color:var(--brand);margin:0 auto 20px}
 .empty-symbol .icon{width:29px;height:29px;stroke-width:1.4}
@@ -1504,7 +1495,6 @@ body.auth-locked{overflow:hidden}
     <div class="tree-search-wrap"><svg class="icon"><use href="#i-search"/></svg><input id="treeSearch" type="search" placeholder="Tìm thư mục..." aria-label="Tìm trong cây thư mục" autocomplete="off"></div>
     <nav class="tree-scroll" aria-label="Cây thư mục tài liệu"><div id="folderTree" role="tree" aria-label="Thư mục"></div></nav>
     <div class="sidebar-bottom">
-      <div class="local-note"><span class="local-note-icon"><svg class="icon"><use href="#i-shield"/></svg></span><span><strong>Bản mẫu trên thiết bị</strong><small>Chưa kết nối máy chủ</small></span><span class="status-dot"></span></div>
       <div class="sidebar-footnote"><span>DocHub Studio · v2.2</span><button class="text-button" data-action="help">Trợ giúp <span aria-hidden="true">↗</span></button></div>
     </div>
   </aside>
@@ -1522,7 +1512,6 @@ body.auth-locked{overflow:hidden}
       <button class="profile-button" data-action="account" aria-label="Tài khoản Vũ Ngọc Lan"><span class="avatar profile-avatar">NL</span><span class="profile-copy"><strong>Vũ Ngọc Lan</strong><small>Quản trị viên · Mẫu</small></span><svg class="icon tiny profile-chevron"><use href="#i-down"/></svg></button>
     </header>
     <main id="workspace" class="workspace" tabindex="-1"><div class="boot-message">Đang mở không gian tài liệu...</div></main>
-    <footer class="workspace-footer"><span><span class="status-dot"></span> Dữ liệu mẫu · Lưu cục bộ trên trình duyệt</span><button class="text-button" data-action="help"><svg class="icon tiny"><use href="#i-help"/></svg> Hướng dẫn sử dụng</button></footer>
   </div>
 </div>
 <div id="selectionBar" class="selection-bar" hidden></div>
@@ -2388,11 +2377,6 @@ window.DocHubMedia={init,open,typeOf,getSession:()=>session};
     document.documentElement.dataset.theme=isDark?'dark':'light';
     document.documentElement.dataset.density=state.preferences.density==='compact'?'compact':'comfortable';
     $('#workspaceName').textContent=state.preferences.workspaceName || 'Không gian doanh nghiệp';
-    if(window.DocHubAPI?.connected){
-      $('.local-note strong').textContent='Máy chủ cục bộ';$('.local-note small').textContent='Tệp và thư mục được lưu trên máy';
-      $('.workspace-footer>span').innerHTML='<span class="status-dot"></span> Chế độ thử nghiệm · Chưa có đăng nhập';
-      $('.demo-label').innerHTML='<span></span> Kết nối cục bộ';
-    }
     $('meta[name=theme-color]').content=isDark?'#101722':'#f7f9fc';
     const me=user('u1');
     if(me) {
