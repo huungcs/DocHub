@@ -4,9 +4,13 @@
   "description": "Hệ thống quản lý, lưu trữ và phân quyền tài liệu đa người dùng tích hợp Google Drive & Supabase",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js",
-    "dev": "node server.js",
-    "build": "node scripts/build.js"
+    "start": "npm run build && node server.js",
+    "build": "node scripts/build.js",
+    "test": "node --test tests/unit/*.test.js tests/cloud/*.test.js && npm run test:auth",
+    "test:unit": "node --test tests/unit/*.test.js",
+    "test:cloud": "node --test tests/cloud/*.test.js",
+    "test:auth": "node tests/unit/auth/cloud-bridge.test.js",
+    "check": "npm test && npm run build"
   },
   "keywords": [
     "dochub",

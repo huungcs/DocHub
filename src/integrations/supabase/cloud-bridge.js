@@ -27,6 +27,12 @@
   let timer = null;
   let pendingState = null;
   let saveQueue = Promise.resolve();
+  let authStatus = supabase ? 'checking' : 'unavailable';
+  let authError = supabase ? null : 'Không tải được thư viện Supabase.';
+  let authReadyResolve;
+  let authReadySettled = false;
+  let connectedDriveToken = null;
+  let googleProviderEnabled = null;
 
   // Khởi tạo IndexedDB cục bộ làm bộ đệm tốc độ cao
   const DB_NAME = 'dochub_cloud_cache_v1';
@@ -79,7 +85,7 @@
       return !!currentUser;
     },
     get isDriveConnected() {
-      return !!providerToken;
+      return !!providerToken && !!googleDriveFolderId;
     },
     get user() {
       return currentUser;
@@ -89,47 +95,141 @@
     },
     get conflict() {
       return conflict;
+    },
+    get authStatus() {
+      return authStatus;
+    },
+    get authError() {
+      return authError;
+    },
+    get googleProviderEnabled() {
+      return googleProviderEnabled;
     }
   };
 
+  async function checkGoogleProvider() {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 5000);
+    try {
+      const response = await fetch(`${config.SUPABASE_URL}/auth/v1/settings`, {
+        headers: { apikey: config.SUPABASE_ANON_KEY },
+        signal: controller.signal
+      });
+      if (!response.ok) return null;
+      const settings = await response.json();
+      googleProviderEnabled = settings?.external?.google === true;
+      return googleProviderEnabled;
+    } catch (_) {
+      googleProviderEnabled = null;
+      return null;
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+
+  function emitAuth(event = 'AUTH_STATE_CHANGED') {
+    document.dispatchEvent(new CustomEvent('dochub:auth', {
+      detail: {
+        event,
+        status: authStatus,
+        error: authError,
+        connected: !!currentUser,
+        driveConnected: !!providerToken && !!googleDriveFolderId,
+        user: currentUser
+      }
+    }));
+  }
+
+  function settleReady(value) {
+    if (authReadySettled) return;
+    authReadySettled = true;
+    authReadyResolve(value);
+  }
+
+  async function applySession(session, event = 'INITIAL_SESSION') {
+    authError = googleProviderEnabled === false ?
+      'Google Provider chưa được bật trong Supabase Authentication.' : null;
+    currentUser = session?.user || null;
+
+    if (!currentUser) {
+      providerToken = null;
+      googleDriveFolderId = null;
+      connectedDriveToken = null;
+      sessionStorage.removeItem('dochub_google_token');
+      authStatus = googleProviderEnabled === false ? 'configuration_required' : 'signed_out';
+      emitAuth(event);
+      return false;
+    }
+
+    providerToken = session.provider_token || sessionStorage.getItem('dochub_google_token') || null;
+    if (session.provider_token) sessionStorage.setItem('dochub_google_token', session.provider_token);
+    authStatus = providerToken ? 'connecting_drive' : 'authenticated';
+    emitAuth(event);
+
+    if (providerToken && window.DocHubDrive && connectedDriveToken !== providerToken) {
+      try {
+        googleDriveFolderId = await window.DocHubDrive.getOrCreateAppFolder(providerToken, config.GOOGLE_DRIVE_FOLDER_NAME);
+        connectedDriveToken = providerToken;
+        authStatus = 'ready';
+        console.log('DocHub: Đã kết nối thư mục Google Drive ID:', googleDriveFolderId);
+      } catch (driveErr) {
+        googleDriveFolderId = null;
+        connectedDriveToken = null;
+        authStatus = 'drive_error';
+        authError = driveErr?.message || 'Không thể kết nối Google Drive.';
+        console.warn('DocHub: Lỗi kết nối Google Drive:', driveErr);
+      }
+    } else if (!providerToken) {
+      authStatus = 'authenticated';
+    }
+
+    emitAuth(event);
+    return true;
+  }
+
   // Khởi tạo và kiểm tra phiên đăng nhập
-  api.ready = (async () => {
+  api.ready = new Promise(resolve => { authReadyResolve = resolve; });
+  (async () => {
     if (!supabase) {
       console.warn('DocHub: Chưa nạp thư viện Supabase JS.');
-      return false;
+      emitAuth('CLIENT_UNAVAILABLE');
+      settleReady(false);
+      return;
     }
 
     try {
-      // 1. Kiểm tra session hiện tại
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session?.user) {
-        currentUser = session.user;
-        providerToken = session.provider_token || null;
-
-        // Lưu hoặc lấy lại provider_token nếu đã lưu trước đó
-        if (providerToken) {
-          sessionStorage.setItem('dochub_google_token', providerToken);
-        } else {
-          providerToken = sessionStorage.getItem('dochub_google_token');
+      checkGoogleProvider().then(enabled => {
+        if (!currentUser && enabled === false) {
+          authStatus = 'configuration_required';
+          authError = 'Google Provider chưa được bật trong Supabase Authentication.';
+          emitAuth('CONFIGURATION_REQUIRED');
         }
-
-        // Lấy thư mục gốc trên Google Drive nếu có token
-        if (providerToken && window.DocHubDrive) {
-          try {
-            googleDriveFolderId = await window.DocHubDrive.getOrCreateAppFolder(providerToken, config.GOOGLE_DRIVE_FOLDER_NAME);
-            console.log('DocHub: Đã kết nối thư mục Google Drive ID:', googleDriveFolderId);
-          } catch (driveErr) {
-            console.warn('DocHub: Lỗi kết nối Google Drive (Token có thể đã hết hạn):', driveErr);
-          }
-        }
-        return true;
-      }
-      return false;
+      });
+      const { data, error } = await supabase.auth.getSession();
+      if (error) throw error;
+      const authenticated = await applySession(data?.session || null, 'INITIAL_SESSION');
+      settleReady(authenticated);
     } catch (err) {
+      authStatus = 'error';
+      authError = err?.message || 'Không thể khôi phục phiên đăng nhập.';
       console.warn('DocHub Cloud Init Error:', err);
-      return false;
+      emitAuth('INITIAL_SESSION_ERROR');
+      settleReady(false);
     }
   })();
+
+  if (supabase) {
+    supabase.auth.onAuthStateChange((event, session) => {
+      // Defer async work so it does not block Supabase's internal auth callback.
+      setTimeout(() => {
+        applySession(session, event).catch(err => {
+          authStatus = 'error';
+          authError = err?.message || 'Không thể cập nhật phiên đăng nhập.';
+          emitAuth('AUTH_STATE_ERROR');
+        });
+      }, 0);
+    });
+  }
 
   /**
    * Đọc trạng thái không gian làm việc của người dùng từ Supabase
@@ -294,21 +394,38 @@
    * Đăng nhập Google và cấp quyền Google Drive
    */
   api.loginWithGoogle = async () => {
-    if (!supabase) return;
-    const redirectUrl = window.location.href.split('#')[0];
-    const { data, error } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: {
-        scopes: `${config.DRIVE_SCOPE} email profile`,
-        queryParams: {
-          access_type: 'offline',
-          prompt: 'consent'
-        },
-        redirectTo: redirectUrl
-      }
-    });
-    if (error) {
-      alert('Đăng nhập Google thất bại: ' + error.message);
+    if (!supabase) throw new Error('Supabase chưa sẵn sàng. Hãy kiểm tra kết nối mạng và cấu hình.');
+    if (googleProviderEnabled === null) await checkGoogleProvider();
+    if (googleProviderEnabled === false) {
+      authStatus = 'configuration_required';
+      authError = 'Hãy bật Google Provider và nhập OAuth Client ID/Secret trong Supabase Authentication trước.';
+      emitAuth('CONFIGURATION_REQUIRED');
+      throw new Error(authError);
+    }
+    authStatus = 'redirecting';
+    authError = null;
+    emitAuth('SIGN_IN_STARTED');
+    const redirectUrl = `${window.location.origin}${window.location.pathname}${window.location.search}`;
+    try {
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          scopes: `${config.DRIVE_SCOPE} email profile`,
+          queryParams: {
+            access_type: 'offline',
+            prompt: 'consent'
+          },
+          redirectTo: redirectUrl,
+          skipBrowserRedirect: false
+        }
+      });
+      if (error) throw error;
+      return data;
+    } catch (err) {
+      authStatus = currentUser ? 'authenticated' : 'signed_out';
+      authError = err?.message || 'Đăng nhập Google thất bại.';
+      emitAuth('SIGN_IN_ERROR');
+      throw err;
     }
   };
 
@@ -316,9 +433,18 @@
    * Đăng xuất tài khoản
    */
   api.logout = async () => {
+    if (!supabase) return;
+    authStatus = 'signing_out';
+    authError = null;
+    emitAuth('SIGN_OUT_STARTED');
+    await api.flush();
     sessionStorage.removeItem('dochub_google_token');
-    if (supabase) {
-      await supabase.auth.signOut();
+    const { error } = await supabase.auth.signOut({ scope: 'local' });
+    if (error) {
+      authStatus = currentUser ? 'authenticated' : 'signed_out';
+      authError = error.message || 'Đăng xuất thất bại.';
+      emitAuth('SIGN_OUT_ERROR');
+      throw error;
     }
     window.location.reload();
   };

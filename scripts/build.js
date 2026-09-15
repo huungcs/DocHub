@@ -1,8 +1,13 @@
 const fs = require('fs');
 const path = require('path');
 
-const srcPath = path.join(__dirname, '..', 'DocHub-v2.2.html');
-const destPath = path.join(__dirname, '..', 'index.html');
+const projectRoot = path.join(__dirname, '..');
+const srcPath = path.join(projectRoot, 'src', 'app', 'index.template.html');
+const distPath = path.join(projectRoot, 'dist');
+const assetsPath = path.join(distPath, 'assets');
+const destPath = path.join(distPath, 'index.html');
+
+fs.mkdirSync(assetsPath, { recursive: true });
 
 let html = fs.readFileSync(srcPath, 'utf8');
 
@@ -10,38 +15,30 @@ let html = fs.readFileSync(srcPath, 'utf8');
 const headScripts = `
   <!-- Supabase JS & DocHub Cloud Integrations -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="./src/config.js"></script>
-  <script src="./src/google-drive.js"></script>
-  <script src="./src/dochub-cloud-bridge.js"></script>
+  <script src="./assets/client-config.js"></script>
+  <script src="./assets/google-drive-client.js"></script>
+  <script src="./assets/supabase-cloud-bridge.js"></script>
 `;
 
 html = html.replace('<head>', '<head>' + headScripts);
 
-// 2. Replace the old local python server DocHubAPI mock with a comment since dochub-cloud-bridge.js handles window.DocHubAPI
+// 2. Replace the old local mock because the Supabase bridge provides window.DocHubAPI.
 const oldApiRegex = /<script>\s*\/\*\s*Optional same-origin local backend[\s\S]*?window\.DocHubAPI=api;\s*\}\)\(\);\s*<\/script>/;
 
 if (oldApiRegex.test(html)) {
-  html = html.replace(oldApiRegex, `<!-- DocHubAPI is provided by src/dochub-cloud-bridge.js -->`);
+  html = html.replace(oldApiRegex, `<!-- DocHubAPI is provided by assets/supabase-cloud-bridge.js -->`);
   console.log('Successfully replaced old local mock API with DocHub Cloud Bridge.');
 } else {
   console.warn('Old API regex did not match; checking fallback.');
 }
 
-// 3. Enhance Topbar with Google Sign-in / Cloud status button
+// 3. Enhance Topbar with minimal Cloud status indicator (no intrusive button, adhering to avatar menu UI invariant)
 const oldDemoLabel = `<span class="demo-label"><span></span> Bản trải nghiệm</span>`;
-const newCloudWidget = `
-      <div id="cloudAuthBar" style="display:flex;align-items:center;gap:10px;">
-        <button id="btnGoogleAuth" class="btn sm" data-action="google-auth" style="background:#fff;color:#3c4043;border:1px solid #dadce0;box-shadow:0 1px 2px #3c404326;font-size:12px;font-weight:600;padding:5px 12px;border-radius:6px;display:inline-flex;align-items:center;gap:8px;">
-          <svg style="width:16px;height:16px;" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/></svg>
-          <span id="btnGoogleAuthText">Đăng nhập Google & Drive</span>
-        </button>
-        <span class="demo-label" id="cloudStatusBadge" style="margin:0;"><span id="cloudStatusDot"></span> <span id="cloudStatusText">Chế độ xem trước</span></span>
-      </div>
-`;
+const newCloudWidget = `<span class="demo-label" id="cloudStatusBadge"><span id="cloudStatusDot"></span> <span id="cloudStatusText">Bản trải nghiệm</span></span>`;
 
 if (html.includes(oldDemoLabel)) {
   html = html.replace(oldDemoLabel, newCloudWidget);
-  console.log('Successfully added Cloud Auth button to topbar.');
+  console.log('Successfully updated Cloud Status badge in topbar.');
 }
 
 // 4. Update the account menu and actions
@@ -56,8 +53,8 @@ const newAccountCase = `case 'account': {
           const usrRole = isConnected ? 'Tài khoản đám mây (Supabase + Google Drive)' : 'Tài khoản mẫu cục bộ';
           
           let menuHtml = \`<p class="menu-label">\${e(usrName)} · \${e(usrRole)}</p>\`;
-          if (!isConnected) {
-            menuHtml += menuItem('google-auth', 'Đăng nhập Google & Kết nối Drive', 'sparkles');
+          if (!isConnected || !api?.isDriveConnected) {
+            menuHtml += menuItem('google-auth', isConnected ? 'Kết nối lại Google Drive' : 'Đăng nhập Google & Kết nối Drive', 'sparkles');
           }
           menuHtml += menuItem('settings', 'Cài đặt & phân quyền', 'settings', '', 'data-section="general"');
           menuHtml += menuItem('backup-all', 'Xuất bản sao lưu (ZIP)', 'download');
@@ -73,12 +70,20 @@ const newAccountCase = `case 'account': {
         }
         case 'google-auth':
           if (window.DocHubAPI?.loginWithGoogle) {
-            await window.DocHubAPI.loginWithGoogle();
+            try {
+              await window.DocHubAPI.loginWithGoogle();
+            } catch (error) {
+              toast(error?.message || 'Không thể bắt đầu đăng nhập Google.', 'error');
+            }
           }
           break;
         case 'google-logout':
           if (window.DocHubAPI?.logout) {
-            await window.DocHubAPI.logout();
+            try {
+              await window.DocHubAPI.logout();
+            } catch (error) {
+              toast(error?.message || 'Không thể đăng xuất.', 'error');
+            }
           }
           break;`;
 
@@ -94,45 +99,70 @@ const authUiScript = `
   // Tự động cập nhật giao diện khi trạng thái đăng nhập thay đổi
   (async () => {
     if (!window.DocHubAPI) return;
-    await window.DocHubAPI.ready;
     const api = window.DocHubAPI;
-    const btn = document.getElementById('btnGoogleAuth');
-    const btnText = document.getElementById('btnGoogleAuthText');
     const dot = document.getElementById('cloudStatusDot');
     const statusText = document.getElementById('cloudStatusText');
+    const statusBadge = document.getElementById('cloudStatusBadge');
     const profileBtn = document.querySelector('.profile-button');
 
-    if (api.connected && api.user) {
-      const u = api.user;
-      const name = u.user_metadata?.full_name || u.user_metadata?.name || u.email;
-      const email = u.email;
-      const avatarUrl = u.user_metadata?.avatar_url || u.user_metadata?.picture;
+    function renderAuthUi() {
+      const connected = api.connected && api.user;
+      const driveConnected = connected && api.isDriveConnected;
 
-      if (btn) btn.style.display = 'none';
-      if (statusText) statusText.textContent = api.isDriveConnected ? 'Đã kết nối Google Drive' : 'Đã đăng nhập Supabase';
-      if (dot) dot.style.background = '#227358';
+      if (statusBadge) {
+        statusBadge.style.display = '';
+      }
+      if (statusText) {
+        statusText.textContent = driveConnected ? 'Đã kết nối Cloud' : connected ? 'Đã đăng nhập Supabase' : 'Bản trải nghiệm';
+      }
+      if (dot) {
+        dot.style.background = driveConnected || connected ? '#227358' : 'var(--amber)';
+      }
 
-      // Cập nhật Profile button
-      if (profileBtn) {
+      if (connected && profileBtn) {
+        const u = api.user;
+        const name = u.user_metadata?.full_name || u.user_metadata?.name || u.email;
+        const email = u.email || '';
+        const avatarUrl = u.user_metadata?.avatar_url || u.user_metadata?.picture;
         const strong = profileBtn.querySelector('strong');
         const small = profileBtn.querySelector('small');
         const av = profileBtn.querySelector('.avatar');
         if (strong) strong.textContent = name;
         if (small) small.textContent = email;
-        if (av && avatarUrl) {
-          av.style.backgroundImage = \`url('\${avatarUrl}')\`;
-          av.style.backgroundSize = 'cover';
-          av.textContent = '';
+        if (av) {
+          if (avatarUrl) {
+            av.style.backgroundImage = \`url('\${avatarUrl}')\`;
+            av.style.backgroundSize = 'cover';
+            av.style.backgroundPosition = 'center';
+            av.textContent = '';
+          } else {
+            av.style.backgroundImage = '';
+            av.textContent = String(name || 'U').split(/\\s+/).map(part => part[0]).slice(-2).join('').toUpperCase();
+          }
         }
       }
-    } else {
-      if (btn) btn.style.display = 'inline-flex';
-      if (statusText) statusText.textContent = 'Chế độ xem trước';
     }
+
+    document.addEventListener('dochub:auth', renderAuthUi);
+    renderAuthUi();
+    await api.ready;
+    renderAuthUi();
   })();
 `;
 
 html = html.replace('</body>', `<script>${authUiScript}</script></body>`);
 
+const browserAssets = [
+  ['src/config/client-config.js', 'client-config.js'],
+  ['src/integrations/google-drive/client.js', 'google-drive-client.js'],
+  ['src/integrations/supabase/cloud-bridge.js', 'supabase-cloud-bridge.js']
+];
+
+for (const [source, output] of browserAssets) {
+  fs.copyFileSync(path.join(projectRoot, source), path.join(assetsPath, output));
+}
+
 fs.writeFileSync(destPath, html, 'utf8');
-console.log('Successfully built index.html! File size:', fs.statSync(destPath).size);
+fs.writeFileSync(path.join(projectRoot, 'index.html'), html, 'utf8');
+fs.copyFileSync(srcPath, path.join(projectRoot, 'DocHub-v2.2.html'));
+console.log('Successfully built dist/index.html and synced root index.html!');

@@ -3,7 +3,7 @@ const fs = require('fs');
 const path = require('path');
 
 const PORT = process.env.PORT || 3000;
-const ROOT = __dirname;
+const ROOT = path.join(__dirname, 'dist');
 
 const MIME_TYPES = {
   '.html': 'text/html; charset=utf-8',
@@ -23,13 +23,21 @@ const server = http.createServer((req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
 
-  let safeUrl = req.url.split('?')[0].split('#')[0];
+  let safeUrl;
+  try {
+    safeUrl = decodeURIComponent(req.url.split('?')[0].split('#')[0]);
+  } catch {
+    res.writeHead(400, { 'Content-Type': 'text/plain; charset=utf-8' });
+    res.end('400 Bad Request');
+    return;
+  }
   if (safeUrl === '/' || safeUrl === '') safeUrl = '/index.html';
 
-  const filePath = path.join(ROOT, safeUrl);
+  const filePath = path.resolve(ROOT, `.${safeUrl}`);
+  const relativePath = path.relative(ROOT, filePath);
 
-  // Ngăn chặn path traversal
-  if (!filePath.startsWith(ROOT)) {
+  // Chỉ phục vụ tệp đã build trong dist và chặn path traversal.
+  if (relativePath.startsWith('..') || path.isAbsolute(relativePath)) {
     res.writeHead(403);
     res.end('Forbidden');
     return;
@@ -52,5 +60,6 @@ const server = http.createServer((req, res) => {
 
 server.listen(PORT, () => {
   console.log(`\nDocHub Server đang chạy tại: http://localhost:${PORT}`);
+  console.log(`Nguồn phục vụ: ${ROOT}`);
   console.log(`Giao diện chính: http://localhost:${PORT}/index.html\n`);
 });
