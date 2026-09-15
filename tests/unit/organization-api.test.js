@@ -3,6 +3,17 @@ const assert=require('node:assert/strict');
 const {Readable}=require('node:stream');
 const {createApi,seal,unseal}=require('../../src/server/organization-api');
 const org='11111111-1111-1111-1111-111111111111';
+test('Network diagnostics correlate responses without leaking credentials',async()=>{
+ const logs=[];const api=createApi({SUPABASE_URL:'https://test',SUPABASE_SERVICE_ROLE_KEY:'private-key'},async()=>{throw new Error('private-key Bearer secret-token');},{error:(...args)=>logs.push(args)});
+ const res=response();await api(request('/api/organization?action=status&organization='+org,{authorization:'Bearer secret-token'}),res);
+ assert.equal(res.statusCode,502);assert.equal(res.data.requestId,res.headers['X-DocHub-Request-Id']);
+ assert.match(JSON.stringify(logs),/UPSTREAM_CONNECTION_FAILED/);
+ assert.ok(!JSON.stringify([logs,res]).includes('private-key'));assert.ok(!JSON.stringify([logs,res]).includes('secret-token'));
+});
+test('Invalid server URL is rejected without attempting network access',async()=>{
+ const api=createApi({SUPABASE_URL:'SUPABASE_URL=https://test',SUPABASE_SERVICE_ROLE_KEY:'key'},async()=>{assert.fail('Must not fetch');},{error:()=>{}});
+ const res=response();await api(request('/api/organization?action=status&organization='+org,{authorization:'Bearer jwt'}),res);assert.equal(res.statusCode,503);
+});
 function request(url,headers={},method='GET',payload){const req=Readable.from([]);Object.assign(req,{url,headers,method,body:payload});return req;}
 function response(){return {headers:{},setHeader(k,v){this.headers[k]=v;},end(value){this.data=JSON.parse(value);}};}
 test('Owner credentials are authenticated encrypted and bound to one organization',()=>{

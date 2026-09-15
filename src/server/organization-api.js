@@ -17,13 +17,24 @@ async function body(req){
  const chunks=[];let size=0;for await(const chunk of req){size+=chunk.length;if(size>1024*1024)throw fail(413,'Yêu cầu quá lớn.');chunks.push(chunk);}
  try{return JSON.parse(Buffer.concat(chunks).toString()||'{}');}catch{throw fail(400,'Dữ liệu không hợp lệ.');}
 }
-function createApi(env=process.env,fetcher=fetch){
- const base=env.SUPABASE_URL,service=env.SUPABASE_SERVICE_ROLE_KEY,key=env.DOCHUB_TOKEN_KEY||service;
- async function jsonFetch(url,options){const r=await fetcher(url,{...options,signal:AbortSignal.timeout(30000)});if(!r.ok)throw fail(r.status===401?401:502,'Dịch vụ lưu trữ chưa sẵn sàng ('+r.status+').');return r.status===204?null:r.json();}
+function createApi(env=process.env,fetcher=fetch,logger=console){
+ const base=env.SUPABASE_URL?.trim().replace(/\/$/,''),service=env.SUPABASE_SERVICE_ROLE_KEY?.trim(),key=env.DOCHUB_TOKEN_KEY||service;
+ async function jsonFetch(url,options){
+  const stage=url.includes('/auth/v1/')?'supabase-auth':url.includes('/rest/v1/')?'supabase-database':url.includes('oauth2.googleapis.com')?'google-token':'google-api';
+  let r;
+  try{r=await fetcher(url,{...options,signal:AbortSignal.timeout(30000)});}
+  catch(cause){const timeout=['TimeoutError','AbortError'].includes(cause.name);throw Object.assign(fail(timeout?504:502,timeout?'Dịch vụ lưu trữ phản hồi quá chậm.':'Không kết nối được dịch vụ lưu trữ.'),{diagnostic:{stage,code:timeout?'UPSTREAM_TIMEOUT':'UPSTREAM_CONNECTION_FAILED'}});}
+  if(!r.ok){let payload;try{payload=await r.json();}catch{}const known=new Set(['42P01','42501','PGRST205','PGRST301','PGRST302','invalid_grant','invalid_client']);const upstreamCode=payload?.code||payload?.error;
+   throw Object.assign(fail(r.status===401?401:502,'Dịch vụ lưu trữ chưa sẵn sàng ('+r.status+').'),{diagnostic:{stage,code:known.has(upstreamCode)?upstreamCode:'UPSTREAM_HTTP_ERROR',upstreamStatus:r.status}});
+  }
+  if(r.status===204)return null;
+  try{return await r.json();}catch{throw Object.assign(fail(502,'Dịch vụ lưu trữ trả về dữ liệu không hợp lệ.'),{diagnostic:{stage,code:'UPSTREAM_INVALID_JSON'}});}
+ }
  const db=(path,options={},token=service)=>jsonFetch(`${base}/rest/v1/${path}`,{...options,headers:{apikey:service,Authorization:`Bearer ${token}`,'Content-Type':'application/json',Prefer:'return=representation',...options.headers}});
  const rpc=(name,args,token)=>db('rpc/'+name,{method:'POST',body:JSON.stringify(args)},token);
  async function authenticate(req,url){
   if(!base||!service)throw fail(503,'Máy chủ chưa cấu hình kết nối tổ chức.');
+  try{const target=new URL(base);if(target.protocol!=='https:'||target.username||target.password||target.search||target.hash||target.pathname!=='/')throw Error();}catch{throw Object.assign(fail(503,'SUPABASE_URL trên máy chủ không hợp lệ.'),{diagnostic:{stage:'configuration',code:'INVALID_SUPABASE_URL'}});}
   const bearer=/^Bearer (.+)$/i.exec(req.headers.authorization||'')?.[1];if(!bearer)throw fail(401,'Vui lòng đăng nhập.');
   const user=await jsonFetch(`${base}/auth/v1/user`,{headers:{apikey:service,Authorization:`Bearer ${bearer}`}});
   const org=url.searchParams.get('organization');if(!/^[0-9a-f-]{36}$/i.test(org||''))throw fail(400,'Thiếu tổ chức hợp lệ.');
@@ -122,7 +133,9 @@ function createApi(env=process.env,fetcher=fetch){
     res.setHeader('Content-Disposition','attachment');if(req.method==='HEAD'){response.body?.cancel();res.end();return;}await pipeline(Readable.fromWeb(response.body),res);return;
    }else{throw fail(404,'Chức năng chưa được cung cấp.');}
    res.setHeader('Content-Type','application/json; charset=utf-8');res.end(JSON.stringify(result));
-  }catch(error){if(res.headersSent){res.destroy();return;}res.statusCode=error.status||500;res.setHeader('Content-Type','application/json');res.end(JSON.stringify({error:error.status?error.message:'Không xử lý được yêu cầu. Vui lòng thử lại.'}));}
+  }catch(error){const requestId=crypto.randomUUID();const status=error.status||500;
+   if(status>=500||error.diagnostic)logger.error('DocHub organization API',JSON.stringify({requestId,status,...(error.diagnostic||{stage:'handler',code:'INTERNAL_ERROR'})}));
+   if(res.headersSent){res.destroy();return;}res.statusCode=status;res.setHeader('X-DocHub-Request-Id',requestId);res.setHeader('Content-Type','application/json');res.end(JSON.stringify({error:error.status?error.message:'Không xử lý được yêu cầu. Vui lòng thử lại.',requestId}));}
  }
  return handler;
 }
