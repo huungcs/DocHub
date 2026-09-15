@@ -73,13 +73,18 @@ function createApi(env=process.env,fetcher=fetch,logger=console){
     if(!identity.email_verified||identity.email?.toLowerCase()!==c.user.email?.toLowerCase())throw fail(403,'Tài khoản Drive phải là chủ sở hữu đã đăng nhập.');
     await db('organization_drive_connections?on_conflict=organization_id',{method:'POST',headers:{Prefer:'resolution=merge-duplicates,return=representation'},body:JSON.stringify({organization_id:c.org,owner_id:c.user.id,encrypted_refresh_token:seal(input.refreshToken,key,c.org),updated_at:new Date().toISOString()})});result={connected:true};
    }else if(action==='workspace'&&req.method==='GET'){
-    const rows=await db(`user_workspaces?user_id=eq.${c.organization.owner_id}&select=state,revision`);const state=rows[0]?.state;
+    // These reads are independent after authentication. Keep the user's RLS token
+    // on both visibility queries; never cache permission-filtered results globally.
+    const [rows,visible,docs]=await Promise.all([
+     db(`user_workspaces?user_id=eq.${c.organization.owner_id}&select=state,revision`),
+     db(`organization_folders?organization_id=eq.${c.org}&select=folder_uid`,{},c.bearer),
+     db(`documents_index?organization_id=eq.${c.org}&select=*`,{},c.bearer)
+    ]);const state=rows[0]?.state;
     if(!state){result={state:null};}else{
-     const visible=await db(`organization_folders?organization_id=eq.${c.org}&select=folder_uid`,{},c.bearer),ids=new Set(visible.map(f=>f.folder_uid));
-     const output=structuredClone(state),folders=state.folders||[],ancestors=new Set(['all']);
-     for(const f of folders.filter(f=>ids.has(f.id))){let cursor=f,seen=new Set();while(cursor&&!seen.has(cursor.id)){seen.add(cursor.id);ancestors.add(cursor.id);cursor=folders.find(p=>p.id===cursor.parentId);}}
+     const ids=new Set(visible.map(f=>f.folder_uid));
+     const output=structuredClone(state),folders=state.folders||[],ancestors=new Set(['all']),folderById=new Map(folders.map(f=>[f.id,f]));
+     for(const f of folders.filter(f=>ids.has(f.id))){let cursor=f,seen=new Set();while(cursor&&!seen.has(cursor.id)){seen.add(cursor.id);ancestors.add(cursor.id);cursor=folderById.get(cursor.parentId);}}
      output.folders=folders.filter(f=>ancestors.has(f.id)).map(f=>ids.has(f.id)?f:{id:f.id,parentId:f.parentId,name:f.name,kind:'folder',inherit:false,deletedAt:null});
-     const docs=await db(`documents_index?organization_id=eq.${c.org}&select=*`,{},c.bearer);
      // Account snapshots are legacy data shared by multiple organizations.
      // Only the organization-scoped, RLS-filtered index can establish file membership.
      // Never infer membership from a matching folder ID or filename.

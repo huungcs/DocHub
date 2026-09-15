@@ -10,6 +10,27 @@ test('Invalid legacy extensions never become document IDs in the workspace',()=>
  assert.equal(documentExtension('x'.repeat(25),'application/pdf'),'pdf');
 });
 const org='11111111-1111-1111-1111-111111111111';
+test('Workspace reads start concurrently and visibility queries retain user RLS',async()=>{
+ const pending=[];let release;
+ const gate=new Promise(resolve=>{release=resolve;});
+ const api=createApi({SUPABASE_URL:'https://test',SUPABASE_SERVICE_ROLE_KEY:'service'},async(url,options)=>{
+  let data;
+  if(url.includes('/auth/'))data={id:'owner'};
+  else if(url.includes('organization_members'))data=[{organization_role:'owner'}];
+  else if(url.includes('/organizations?'))data=[{owner_id:'owner'}];
+  else {
+   pending.push(url);
+   if(!url.includes('user_workspaces'))assert.equal(options.headers.Authorization,'Bearer jwt');
+   if(pending.length===3)release();
+   await gate;
+   data=url.includes('user_workspaces')?[{state:{folders:[],documents:[]},revision:2}]:[];
+  }
+  return {ok:true,status:200,json:async()=>data};
+ });
+ const res=response();
+ await api(request('/api/organization?action=workspace&organization='+org,{authorization:'Bearer jwt'}),res);
+ assert.equal(pending.length,3);assert.equal(res.data.revision,2);
+});
 test('Workspace excludes stale account files and returns only organization-indexed files',async()=>{
  const snapshot={folders:[{id:'all',parentId:null}],documents:[{id:'stale-id',parentId:'all',name:'same-name',assetStorage:'server'}],preferences:{}};
  const api=createApi({SUPABASE_URL:'https://test',SUPABASE_SERVICE_ROLE_KEY:'service'},async url=>{

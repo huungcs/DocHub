@@ -182,6 +182,13 @@
   async function ensureOrganization() {
     if (!supabase || !currentUser) return null;
     authorizationStatus = 'loading';
+    const preferred=typeof localStorage==='undefined'?null:localStorage.getItem(`dochub.organization.${currentUser.id}`);
+    if(preferred){
+      const {data:member,error:memberError}=await supabase.from('organization_members').select('organization_id,organization_role').eq('user_id',currentUser.id).eq('status','active').eq('organization_id',preferred).maybeSingle();
+      if(memberError)throw memberError;
+      if(member){organization={id:member.organization_id,role:member.organization_role};authorizationStatus='ready';return organization;}
+      localStorage.removeItem(`dochub.organization.${currentUser.id}`);
+    }
     const suggestedName = currentUser.user_metadata?.full_name || currentUser.user_metadata?.name || currentUser.email;
     const { data, error } = await supabase.rpc('dochub_bootstrap_organization', {
       p_name: suggestedName ? `Không gian của ${suggestedName}` : null
@@ -192,13 +199,7 @@
     }
     const row = Array.isArray(data) ? data[0] : data;
     organization = row ? { id: row.organization_id, role: row.organization_role } : null;
-    const preferred=typeof localStorage==='undefined'?null:localStorage.getItem(`dochub.organization.${currentUser.id}`);
-    if(preferred){
-      const {data:member,error:memberError}=await supabase.from('organization_members').select('organization_id,organization_role').eq('user_id',currentUser.id).eq('status','active').eq('organization_id',preferred).maybeSingle();
-      if(memberError)throw memberError;
-      if(member)organization={id:member.organization_id,role:member.organization_role};
-      else localStorage.removeItem(`dochub.organization.${currentUser.id}`);
-    }
+    if(organization&&typeof localStorage!=='undefined')localStorage.setItem(`dochub.organization.${currentUser.id}`,organization.id);
     authorizationStatus = organization ? 'ready' : 'error';
     return organization;
   }
@@ -370,7 +371,7 @@
       if(organization.role==='owner'&&session.provider_refresh_token&&(!status.connected||event==='SIGNED_IN')){
         await backend('connect',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({refreshToken:session.provider_refresh_token})});
       }else if(organization.role==='owner'&&!status.connected){
-        authError='Đăng nhập Google lại một lần để kết nối kho doanh nghiệp.';
+        authError='Mở menu tài khoản → Kết nối lại Google Drive để cấp quyền cho kho doanh nghiệp.';
       }
     }catch(error){authError=error.message;console.warn('Kho doanh nghiệp:',error.message);}
     emitAuth(event);
@@ -682,8 +683,11 @@
     }
   };
   api.getAsset = async (id, parentFolderId = 'all') => {
-    await api.requirePermission(parentFolderId, 'read');
+    await api.ready;
+    // The organization endpoint checks membership and the document's real folder
+    // on every request. Avoid a duplicate RPC using the caller's folder hint.
     if(organizationBackend)return (await backend('asset&id='+encodeURIComponent(id))).blob();
+    await api.requirePermission(parentFolderId, 'read');
     // 1. Kiểm tra cache IndexedDB
     const cached = await cacheGet('assets', userCacheKey(id));
     if (cached) return cached;
@@ -765,7 +769,7 @@
   /**
    * Đăng nhập Google và cấp quyền Google Drive
    */
-  api.loginWithGoogle = async () => {
+  api.loginWithGoogle = async ({ reconnectDrive = false } = {}) => {
     if (!supabase) throw new Error('Supabase chưa sẵn sàng. Hãy kiểm tra kết nối mạng và cấu hình.');
     if (googleProviderEnabled === null) await checkGoogleProvider();
     if (googleProviderEnabled === false) {
@@ -785,7 +789,7 @@
           scopes: `${config.DRIVE_SCOPE} email profile`,
           queryParams: {
             access_type: 'offline',
-            prompt: 'consent'
+            ...(reconnectDrive === true ? { prompt: 'consent' } : {})
           },
           redirectTo: redirectUrl,
           skipBrowserRedirect: false

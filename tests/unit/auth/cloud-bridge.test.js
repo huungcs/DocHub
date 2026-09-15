@@ -132,6 +132,12 @@ async function createHarness({ googleEnabled, session }) {
   assert.strictEqual(signedOut.calls.oauth.provider, 'google');
   assert.strictEqual(signedOut.calls.oauth.options.redirectTo, 'http://localhost:3000/');
   assert.match(signedOut.calls.oauth.options.scopes, /drive\.file/);
+  assert.strictEqual(signedOut.calls.oauth.options.queryParams.access_type, 'offline');
+  assert.strictEqual(signedOut.calls.oauth.options.queryParams.prompt, undefined);
+  await signedOut.api.loginWithGoogle({ reconnectDrive: true });
+  assert.strictEqual(signedOut.calls.oauth.options.queryParams.prompt, 'consent');
+  await signedOut.api.loginWithGoogle();
+  assert.strictEqual(signedOut.calls.oauth.options.queryParams.prompt, undefined);
 
   const missingProvider = await createHarness({ googleEnabled: false, session: null });
   assert.strictEqual(missingProvider.api.googleProviderEnabled, false);

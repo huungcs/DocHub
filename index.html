@@ -3470,8 +3470,10 @@ function openHelp() {
           
           let menuHtml = `<p class="menu-label">${e(usrName)} · ${e(usrRole)}</p>`;
           if(isConnected) menuHtml += menuItem('switch-workspace','Chuyển không gian','building');
-          if (!isConnected || !api?.isDriveConnected) {
-            menuHtml += menuItem('google-auth', isConnected ? 'Kết nối lại Google Drive' : 'Đăng nhập Google & Kết nối Drive', 'sparkles');
+          if (!isConnected) {
+            menuHtml += menuItem('google-auth', 'Đăng nhập Google & Kết nối Drive', 'sparkles');
+          } else if (api?.organization?.role === 'owner' || !api?.organization) {
+            menuHtml += menuItem('google-reconnect', 'Kết nối lại Google Drive', 'sparkles');
           }
           menuHtml += menuItem('settings', 'Cài đặt & phân quyền', 'settings', '', 'data-section="general"');
           menuHtml += menuItem('backup-all', 'Xuất bản sao lưu (ZIP)', 'download');
@@ -3500,6 +3502,15 @@ function openHelp() {
               await window.DocHubAPI.loginWithGoogle();
             } catch (error) {
               toast(error?.message || 'Không thể bắt đầu đăng nhập Google.', 'error');
+            }
+          }
+          break;
+        case 'google-reconnect':
+          if (window.DocHubAPI?.loginWithGoogle) {
+            try {
+              await window.DocHubAPI.loginWithGoogle({ reconnectDrive: true });
+            } catch (error) {
+              toast(error?.message || 'Không thể kết nối lại Google Drive.', 'error');
             }
           }
           break;
