@@ -13,10 +13,14 @@ let html = fs.readFileSync(srcPath, 'utf8');
 
 // 1. Inject Supabase JS and DocHub Cloud Bridge scripts in <head>
 const headScripts = `
+  <!-- High-Speed Preconnect & DNS-Prefetch -->
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+  <link rel="dns-prefetch" href="https://cdn.jsdelivr.net">
+  <link rel="preconnect" href="https://ethrdeaeemkjgolmkrmq.supabase.co" crossorigin>
+  <link rel="dns-prefetch" href="https://ethrdeaeemkjgolmkrmq.supabase.co">
+
   <!-- Supabase JS & DocHub Cloud Integrations -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
-  <script>if(window.pdfjsLib)window.pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js';</script>
   <script src="./assets/client-config.js"></script>
   <script src="./assets/search-engine.js"></script>
   <script src="./assets/google-drive-client.js"></script>
@@ -279,6 +283,8 @@ html = html.replace('</body>', `<script>${authUiScript}</script></body>`);
 
 const browserAssets = [
   ['src/app/search-engine.js', 'search-engine.js'],
+  ['src/app/sample-data.js', 'sample-data.js'],
+  ['src/app/jszip.min.js', 'jszip.min.js'],
   ['src/config/client-config.js', 'client-config.js'],
   ['src/integrations/google-drive/client.js', 'google-drive-client.js'],
   ['src/integrations/supabase/cloud-bridge.js', 'supabase-cloud-bridge.js']
