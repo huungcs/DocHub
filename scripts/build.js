@@ -57,6 +57,7 @@ const newAccountCase = `case 'account': {
           const usrRole = isConnected ? 'Tài khoản đám mây (Supabase + Google Drive)' : isDemo ? 'Bản trải nghiệm Demo (Dữ liệu mẫu)' : 'Tài khoản mẫu cục bộ';
           
           let menuHtml = \`<p class="menu-label">\${e(usrName)} · \${e(usrRole)}</p>\`;
+          if(isConnected) menuHtml += menuItem('switch-workspace','Chuyển không gian','building');
           if (!isConnected || !api?.isDriveConnected) {
             menuHtml += menuItem('google-auth', isConnected ? 'Kết nối lại Google Drive' : 'Đăng nhập Google & Kết nối Drive', 'sparkles');
           }

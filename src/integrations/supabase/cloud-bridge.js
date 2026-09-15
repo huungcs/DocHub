@@ -138,7 +138,7 @@
 
   // Browser cache is namespaced by Supabase user to prevent cross-account data leaks.
   function userCacheKey(key) {
-    return `${currentUser?.id || 'guest'}:${key}`;
+    return `${currentUser?.id || 'guest'}:${organization?.id || 'personal'}:${key}`;
   }
 
   // Đối tượng API thay thế cho window.DocHubAPI
@@ -192,10 +192,36 @@
     }
     const row = Array.isArray(data) ? data[0] : data;
     organization = row ? { id: row.organization_id, role: row.organization_role } : null;
+    const preferred=typeof localStorage==='undefined'?null:localStorage.getItem(`dochub.organization.${currentUser.id}`);
+    if(preferred){
+      const {data:member,error:memberError}=await supabase.from('organization_members').select('organization_id,organization_role').eq('user_id',currentUser.id).eq('status','active').eq('organization_id',preferred).maybeSingle();
+      if(memberError)throw memberError;
+      if(member)organization={id:member.organization_id,role:member.organization_role};
+      else localStorage.removeItem(`dochub.organization.${currentUser.id}`);
+    }
     authorizationStatus = organization ? 'ready' : 'error';
     return organization;
   }
 
+  api.listOrganizations=async()=>{
+    if(!currentUser)return [];
+    const {data,error}=await supabase.from('organization_members').select('organization_id,organization_role,organizations(name)').eq('user_id',currentUser.id).eq('status','active');
+    if(error)throw error;
+    return (data||[]).map(m=>({id:m.organization_id,role:m.organization_role,name:m.organizations?.name||'Không gian làm việc'}));
+  };
+  api.switchOrganization=async(id)=>{
+    if(!organizationBackend)throw new Error('Cần triển khai backend tổ chức trước khi chuyển không gian.');
+    const memberships=await api.listOrganizations();
+    if(!memberships.some(m=>m.id===id))throw new Error('Bạn không còn là thành viên của không gian này.');
+    let failed=false;
+    const onSync=event=>{if(event.detail?.ok===false)failed=true;};
+    document.addEventListener('dochub:sync',onSync);
+    try{await api.flush();}finally{document.removeEventListener('dochub:sync',onSync);}
+    if(failed)throw new Error('Chưa lưu được thay đổi. Vui lòng thử lại trước khi chuyển không gian.');
+    if(conflict||pendingState)throw new Error('Hãy lưu xong thay đổi trước khi chuyển không gian.');
+    localStorage.setItem(`dochub.organization.${currentUser.id}`,id);
+    location.assign(location.pathname+'?folder=all');
+  };
   async function checkGoogleProvider() {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 5000);

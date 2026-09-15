@@ -222,7 +222,9 @@ svg.icon.tiny{width:15px;height:15px}
 .brand strong{font-size:25px;letter-spacing:-.9px;line-height:1.15;display:block;font-weight:720}
 .brand-dot{color:var(--brand)}
 .brand small{font-size:8px;letter-spacing:2.65px;color:var(--subtle);display:block;font-weight:650;margin-top:4px}
-.workspace-switch{display:flex;align-items:center;gap:10px;margin:10px 18px 22px;padding:11px 10px;background:var(--surface-soft);border:1px solid var(--line);border-radius:10px}
+.workspace-switch{display:flex;align-items:center;gap:10px;width:calc(100% - 36px);box-sizing:border-box;min-width:0;text-align:left;font:inherit;cursor:pointer;margin:10px 18px 22px;padding:11px 10px;background:var(--surface-soft);border:1px solid var(--line);border-radius:10px}
+.workspace-switch>.workspace-avatar,.workspace-switch>span:last-child{flex-shrink:0}
+.workspace-switch small{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .workspace-switch>span:nth-child(2){min-width:0;flex:1}
 .workspace-switch strong{display:block;font-size:11.5px;color:var(--ink);font-weight:620;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .workspace-switch small{font-size:10.5px;color:var(--muted);display:block;margin-top:1px}
@@ -955,6 +957,15 @@ body.has-uploads .toast-stack{bottom:415px}
  .permission-chips{gap:6px}.permission-chip{border-radius:6px;padding:6px 8px}
 }
 @media(max-width:380px){.permissions-table tr{grid-template-columns:minmax(0,1fr) 24px}.permissions-table td:nth-child(2){grid-column:1;grid-row:2;padding-left:40px!important}.permissions-table td:nth-child(3){grid-row:3}.permissions-table td:last-child{grid-column:2;grid-row:1}}
+    .organization-options{display:grid;gap:10px;margin-bottom:18px}
+    .organization-option{display:flex;align-items:center;gap:12px;width:100%;min-height:80px;padding:14px;border:1px solid #e1e8f4;border-radius:14px;background:#fff;color:#233451;text-align:left;font:inherit;cursor:pointer}
+    .organization-option>span:nth-child(2){flex:1;min-width:0}
+    .organization-option strong{display:block;overflow-wrap:anywhere;font-size:14px}
+    .organization-option small{display:block;margin-top:5px;color:#73839d;font-size:12px}
+    .organization-option>span:last-child{font-size:11px;color:#3164ee;flex-shrink:0}
+    .organization-option[aria-current]{background:#edf3ff;border-color:#b4caff;opacity:1;cursor:default}
+    .organization-option:hover:not(:disabled){background:#f7f9fd;border-color:#b4caff}
+    .organization-option:focus-visible,.workspace-switch:focus-visible{outline:2px solid #3164ee;outline-offset:3px}
   </style>
   <style>
 /* Studio design system: touch-first controls, local overflow, accessible contrast. */
@@ -1175,7 +1186,7 @@ input[type="checkbox"]:disabled {opacity:.45;cursor:not-allowed}
   .nav-dialog .sidebar {height:100%;width:100%;padding-top:env(safe-area-inset-top,0px)}
   .nav-dialog .brand-row {height:70px;padding:0 18px}
   .nav-dialog .brand strong {font-size:25px}
-  .nav-dialog .workspace-switch {margin:0 14px 18px;padding:11px}
+  .nav-dialog .workspace-switch {width:calc(100% - 28px);margin:0 14px 18px;padding:11px}
   .nav-dialog .workspace-switch strong {font-size:13px}
   .nav-dialog .workspace-switch small {font-size:11px}
   .nav-dialog .sidebar-section-heading {padding:0 16px 0 21px;font-size:10px;margin-bottom:6px}
@@ -1754,7 +1765,7 @@ body.auth-locked{overflow:hidden}
       </a>
       <button class="icon-btn mobile-only" data-action="close-nav" aria-label="Đóng cây thư mục"><svg class="icon"><use href="#i-close"/></svg></button>
     </div>
-    <div class="workspace-switch"><span class="workspace-avatar"><svg class="icon"><use href="#i-building"/></svg></span><span><strong id="workspaceName">Không gian doanh nghiệp</strong><small>Tài liệu &amp; tri thức nội bộ</small></span><span class="workspace-indicator" title="Bản mẫu trên thiết bị"></span></div>
+    <button type="button" class="workspace-switch" data-action="switch-workspace" aria-label="Chuyển không gian tổ chức"><span class="workspace-avatar"><svg class="icon"><use href="#i-building"/></svg></span><span><strong id="workspaceName">Không gian doanh nghiệp</strong><small>Chọn không gian làm việc</small></span><span aria-hidden="true">⌄</span></button>
     <div class="sidebar-section-heading"><span>CÂY THƯ MỤC</span><button class="icon-btn small" data-action="new-folder" aria-label="Tạo thư mục" title="Tạo thư mục"><svg class="icon"><use href="#i-plus"/></svg></button></div>
     <div class="tree-search-wrap"><svg class="icon"><use href="#i-search"/></svg><input id="treeSearch" type="search" placeholder="Tìm thư mục..." aria-label="Tìm trong cây thư mục" autocomplete="off"></div>
     <nav class="tree-scroll" aria-label="Cây thư mục tài liệu"><div id="folderTree" role="tree" aria-label="Thư mục"></div></nav>
@@ -2270,7 +2281,7 @@ window.DocHubMedia={init,open,typeOf,getSession:()=>session};
 
   function stateStorageKey() {
     const accountId=window.DocHubAPI?.user?.id;
-    return accountId?`${STORAGE_KEY_BASE}.${accountId}`:`${STORAGE_KEY_BASE}.guest`;
+    return accountId?`${STORAGE_KEY_BASE}.${accountId}.${window.DocHubAPI?.organization?.id||'personal'}`:`${STORAGE_KEY_BASE}.guest`;
   }
 
   let storageWarning = '';
@@ -3307,6 +3318,17 @@ function openHelp() {
     if(target.closest('#menuDialog'))closeDialog('menuDialog');
     try {
       switch(action) {
+        case 'switch-workspace':{
+          if(!window.DocHubAPI?.connected){toast('Đăng nhập để xem các tổ chức đã tham gia.','info');break;}
+          openForm({title:'Chuyển không gian',subtitle:'Dữ liệu và quyền truy cập riêng cho từng tổ chức',symbol:'building',kind:'help',body:'<p role="status">Đang tải các tổ chức của bạn…</p>'});
+          const organizations=await window.DocHubAPI.listOrganizations();
+          openForm({title:'Chuyển không gian',subtitle:`${organizations.length} tổ chức đã tham gia`,symbol:'building',kind:'help',body:`<div class="organization-options">${organizations.map(org=>`<button type="button" class="organization-option" data-action="select-workspace" data-id="${e(org.id)}" ${org.id===window.DocHubAPI.organization?.id?'disabled aria-current="true"':''}><span class="workspace-avatar">${icon('building')}</span><span><strong>${e(org.name)}</strong><small>${e(({owner:'Chủ sở hữu',admin:'Quản trị viên',member:'Thành viên'})[org.role]||'Thành viên')}</small></span><span>${org.id===window.DocHubAPI.organization?.id?'Đang chọn':icon('chevron')}</span></button>`).join('')||'<p>Bạn chưa tham gia tổ chức nào.</p>'}</div><p class="principal-caption">Chỉ những tài liệu được cấp quyền mới hiển thị trong không gian đã chọn.</p>`});
+          break;
+        }
+        case 'select-workspace':{
+          if([...uploadJobs.values()].some(job=>job.running)){toast('Vui lòng chờ tải tệp hoàn tất trước khi chuyển không gian.','info');break;}
+          await window.DocHubAPI.switchOrganization(id);break;
+        }
         case 'navigate':navigate(id);break;
         case 'toggle-tree':
           ui.expanded.has(id)?ui.expanded.delete(id):ui.expanded.add(id);
@@ -3404,6 +3426,7 @@ function openHelp() {
           const usrRole = isConnected ? 'Tài khoản đám mây (Supabase + Google Drive)' : isDemo ? 'Bản trải nghiệm Demo (Dữ liệu mẫu)' : 'Tài khoản mẫu cục bộ';
           
           let menuHtml = `<p class="menu-label">${e(usrName)} · ${e(usrRole)}</p>`;
+          if(isConnected) menuHtml += menuItem('switch-workspace','Chuyển không gian','building');
           if (!isConnected || !api?.isDriveConnected) {
             menuHtml += menuItem('google-auth', isConnected ? 'Kết nối lại Google Drive' : 'Đăng nhập Google & Kết nối Drive', 'sparkles');
           }
