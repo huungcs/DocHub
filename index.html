@@ -2440,6 +2440,7 @@ window.DocHubMedia={init,open,typeOf,getSession:()=>session};
       if(DocHubAPI.conflict)throw new Error('Dữ liệu đã thay đổi ở nơi khác. Tải lại trước khi lưu.');
       try{const result=await DocHubAPI.putAsset(id,file,parentFolderId,options);return result?.driveStored?'server':'device';}
       catch(error){
+        if(window.DocHubAPI?.usesOrganizationBackend)throw error;
         if(error?.code==='permission_denied'||/không có quyền/i.test(error?.message||''))throw error;
         if(error?.name==='AbortError')throw error;
         toast('Chưa lưu được lên máy chủ. Đang thử lưu trên trình duyệt này.','warning');
@@ -3118,7 +3119,7 @@ window.DocHubMedia={init,open,typeOf,getSession:()=>session};
     if(!job?.file||job.running)return false;
     job.running=true;job.error='';job.startedAt=Date.now();job.controller=new AbortController();updateUploadJob(job,{phase:'queued',loaded:0,percent:0});
     try {
-      const assetStorage=await saveAsset(job.docId,job.file,job.parentId,{signal:job.controller.signal,onProgress:progress=>updateUploadJob(job,progress)}),now=new Date().toISOString();
+      const assetStorage=await saveAsset(job.docId,job.file,job.parentId,{fileName:job.name+(job.ext?'.'+job.ext:''),ext:job.ext,signal:job.controller.signal,onProgress:progress=>updateUploadJob(job,progress)}),now=new Date().toISOString();
       if(!job.documentAdded){state.documents.push({id:job.docId,parentId:job.parentId,name:job.name,ext:job.ext,bytes:job.file.size,ownerId:'u1',description:'',updatedAt:now,createdAt:now,starred:false,kind:'file',sample:false,source:'upload',assetStorage,mime:job.file.type||mimeFor(job.ext),deletedAt:null});job.documentAdded=true;commit('Tải lên tài liệu',job.parentId,`${job.fileName} · ${assetStorage==='server'?'Google Drive':'thiết bị này'}`,'upload');}
       else if(assetStorage==='server'){const existing=doc(job.docId);if(existing){existing.assetStorage='server';existing.updatedAt=now;}commit('Đồng bộ lại tài liệu',job.parentId,`${job.fileName} · Google Drive`,'upload');}
       updateUploadJob(job,{phase:assetStorage==='server'?'complete':'local',loaded:job.total,percent:100});

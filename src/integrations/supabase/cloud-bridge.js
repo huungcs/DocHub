@@ -37,6 +37,15 @@
   let workspaceLoadStatus = 'idle';
   let organization = null;
   let authorizationStatus = 'idle';
+  let organizationBackend=false;
+  let loadedSharedState=null;
+  async function backend(action,options={}) {
+    const {data,error}=await supabase.auth.getSession();
+    if(error||!data?.session?.access_token)throw new Error('Vui lòng đăng nhập lại.');
+    const response=await fetch(`/api/organization?action=${action}&organization=${encodeURIComponent(organization.id)}`,{...options,headers:{Authorization:`Bearer ${data.session.access_token}`,...options.headers}});
+    if(!response.ok){const payload=await response.json().catch(()=>({}));throw new Error(payload.error||'Không kết nối được kho doanh nghiệp.');}
+    return response;
+  }
 
   // Khởi tạo IndexedDB cục bộ làm bộ đệm tốc độ cao
   const DB_NAME = 'dochub_cloud_cache_v1';
@@ -140,6 +149,7 @@
     get isDriveConnected() {
       return !!providerToken && !!googleDriveFolderId;
     },
+    get usesOrganizationBackend(){return organizationBackend;},
     get user() {
       return currentUser;
     },
@@ -267,6 +277,7 @@
       providerToken = null;
       googleDriveFolderId = null;
       connectedDriveToken = null;
+      organizationBackend=false;loadedSharedState=null;
       sessionStorage.removeItem('dochub_google_token');
       authStatus = googleProviderEnabled === false ? 'configuration_required' : 'signed_out';
       emitAuth(event);
@@ -305,6 +316,14 @@
       authStatus = 'authenticated';
     }
 
+    try {
+      const status=await (await backend('status')).json();organizationBackend=true;
+      if(organization.role==='owner'&&session.provider_refresh_token){
+        await backend('connect',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({refreshToken:session.provider_refresh_token})});
+      }else if(organization.role==='owner'&&!status.connected){
+        authError='Đăng nhập Google lại một lần để kết nối kho doanh nghiệp.';
+      }
+    }catch(error){authError=error.message;console.warn('Kho doanh nghiệp:',error.message);}
     emitAuth(event);
     return true;
   }
@@ -364,6 +383,10 @@
     }
 
     workspaceLoadStatus = 'loading';
+    if(organizationBackend){
+      try{const result=await (await backend('workspace')).json();loadedSharedState=result.state;revision=result.revision||1;workspaceLoadStatus=result.state?'loaded':'not_found';return result.state;}
+      catch(error){workspaceLoadStatus='error';throw error;}
+    }
     try {
       const { data, error } = await supabase
         .from('user_workspaces')
@@ -417,6 +440,19 @@
 
     saveQueue = saveQueue.then(async () => {
       try {
+        if(organizationBackend&&organization?.role==='owner'&&loadedSharedState){
+          for(const item of snapshot.documents||[]){const previous=loadedSharedState.documents.find(d=>d.id===item.id);if(!previous||previous.assetStorage!=='server')continue;
+            if(['name','description','parentId','deletedAt'].some(k=>(item[k]||null)!==(previous[k]||null)))await backend('document-update',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:item.id,name:item.name,description:item.description||'',parentId:item.parentId,deletedAt:item.deletedAt||null})});
+          }
+        }
+        if(organizationBackend&&organization?.role!=='owner'){
+          if(!loadedSharedState)throw new Error('Chủ sở hữu chưa khởi tạo không gian chung.');
+          for(const field of ['folders','users','groups','acl'])if(JSON.stringify(snapshot[field])!==JSON.stringify(loadedSharedState[field]))throw new Error('Thay đổi cơ cấu và phân quyền cần thực hiện bằng tài khoản chủ sở hữu.');
+          for(const item of snapshot.documents||[]){const previous=loadedSharedState.documents.find(d=>d.id===item.id);if(!previous)continue;
+            if(['name','description','parentId','deletedAt'].some(k=>(item[k]||null)!==(previous[k]||null)))await backend('document-update',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:item.id,name:item.name,description:item.description||'',parentId:item.parentId,deletedAt:item.deletedAt||null})});
+          }
+          loadedSharedState=structuredClone(snapshot);document.dispatchEvent(new CustomEvent('dochub:sync',{detail:{ok:true}}));return;
+        }
         if (!organization) await ensureOrganization();
         if (organization && ['owner', 'admin'].includes(organization.role)) {
           const { error: authorizationError } = await supabase.rpc('dochub_sync_authorization_snapshot', {
@@ -440,9 +476,10 @@
 
         if (error) throw error;
         revision = nextRevision;
+        loadedSharedState=structuredClone(snapshot);
         if(organization?.role==='owner'&&providerToken)await mirrorDriveFolders();
         driveSharingEnabled = snapshot.preferences?.driveSharingEnabled === true;
-        if (driveSharingEnabled && organization && ['owner','admin'].includes(organization.role)) await api.syncDrivePermissions();
+        if (!organizationBackend && driveSharingEnabled && organization && ['owner','admin'].includes(organization.role)) await api.syncDrivePermissions();
         document.dispatchEvent(new CustomEvent('dochub:sync', { detail: { ok: true } }));
       } catch (err) {
         console.error('Lỗi lưu dữ liệu lên Supabase:', err);
@@ -484,6 +521,18 @@
   api.putAsset = async (id, blob, parentFolderId = 'all', options = {}) => {
     const { onProgress, signal } = options;
     await api.requirePermission(parentFolderId, 'create');
+    if(organizationBackend){
+      const ext=options.ext||blob.name?.split('.').pop()||'';
+      const start=await (await backend('upload-start',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id,folder:parentFolderId,name:options.fileName||blob.name||id,ext,mime:blob.type,bytes:blob.size}),signal})).json();
+      let complete=false;
+      for(let offset=0;offset<blob.size;offset+=start.chunkSize){
+        const end=Math.min(blob.size,offset+start.chunkSize);
+        const result=await (await backend('upload-chunk&upload='+encodeURIComponent(start.id),{method:'PUT',headers:{'Content-Type':'application/octet-stream','Content-Range':`bytes ${offset}-${end-1}/${blob.size}`},body:blob.slice(offset,end),signal})).json();
+        complete=result.complete;onProgress?.({phase:'uploading',loaded:end,total:blob.size,percent:Math.round(end/blob.size*100)});
+      }
+      if(!complete)throw new Error('Kho doanh nghiệp chưa xác nhận tải xong.');
+      return {driveStored:true,cached:false};
+    }
     if (signal?.aborted) {
       const error = new Error('Đã hủy tải tệp lên.');
       error.name = 'AbortError';
@@ -585,6 +634,7 @@
   };
   api.getAsset = async (id, parentFolderId = 'all') => {
     await api.requirePermission(parentFolderId, 'read');
+    if(organizationBackend)return (await backend('asset&id='+encodeURIComponent(id))).blob();
     // 1. Kiểm tra cache IndexedDB
     const cached = await cacheGet('assets', userCacheKey(id));
     if (cached) return cached;
@@ -613,6 +663,11 @@
    */
   api.getAssetStream = async (id, parentFolderId = 'all', mime = 'application/octet-stream') => {
     await api.requirePermission(parentFolderId, 'read');
+    if(organizationBackend){
+      const {data}=await supabase.auth.getSession(),key=globalThis.crypto.randomUUID();
+      const registered=await postStreamWorker({type:'DOCHUB_STREAM_REGISTER',key,fileId:id,googleToken:data.session.access_token,organizationId:organization.id,mime});
+      return registered?{key,url:`/__dochub_drive_stream__/${key}/${encodeURIComponent(id)}`} :null;
+    }
     if (!providerToken) return null;
     const meta = await getDriveMeta(id);
     if (!meta?.driveId) return null;
@@ -641,6 +696,7 @@
    */
   api.removeAsset = async (id, parentFolderId = 'all') => {
     await api.requirePermission(parentFolderId, 'delete');
+    if(organizationBackend){await backend('document-update',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id,trash:true})});return;}
     await cacheDelete('assets', userCacheKey(id));
     if (providerToken && window.DocHubDrive) {
       const meta = await cacheGet('meta', userCacheKey(id));

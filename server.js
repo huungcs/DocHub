@@ -1,6 +1,8 @@
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
+if (typeof process.loadEnvFile === 'function' && fs.existsSync(path.join(__dirname,'.env'))) process.loadEnvFile(path.join(__dirname,'.env'));
+const organizationApi=require('./src/server/organization-api').createApi();
 
 const PORT = process.env.PORT || 3000;
 const ROOT = path.join(__dirname, 'dist');
@@ -19,6 +21,7 @@ const MIME_TYPES = {
 };
 
 const server = http.createServer((req, res) => {
+  if(req.url.split('?')[0]==='/api/organization'){organizationApi(req,res);return;}
   // CORS Headers
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');

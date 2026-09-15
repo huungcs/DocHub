@@ -15,6 +15,7 @@ self.addEventListener('message', event => {
     streams.set(data.key, {
       fileId: String(data.fileId),
       googleToken: String(data.googleToken),
+      organizationId:data.organizationId||null,
       mime: String(data.mime || 'application/octet-stream'),
       expiresAt: Date.now() + 55 * 60 * 1000
     });
@@ -48,7 +49,7 @@ async function streamFromDrive(request, url) {
 
   try {
     const driveResponse = await fetch(
-      `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(stream.fileId)}?alt=media`,
+      stream.organizationId?`/api/organization?action=asset&organization=${encodeURIComponent(stream.organizationId)}&id=${encodeURIComponent(stream.fileId)}`:`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(stream.fileId)}?alt=media`,
       { method: request.method === 'HEAD' ? 'HEAD' : 'GET', headers, redirect: 'follow' }
     );
     const responseHeaders = new Headers(driveResponse.headers);

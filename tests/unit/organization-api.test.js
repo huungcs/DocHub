@@ -1,0 +1,37 @@
+const {test}=require('node:test');
+const assert=require('node:assert/strict');
+const {Readable}=require('node:stream');
+const {createApi,seal,unseal}=require('../../src/server/organization-api');
+const org='11111111-1111-1111-1111-111111111111';
+function request(url,headers={},method='GET',payload){const req=Readable.from([]);Object.assign(req,{url,headers,method,body:payload});return req;}
+function response(){return {headers:{},setHeader(k,v){this.headers[k]=v;},end(value){this.data=JSON.parse(value);}};}
+test('Owner credentials are authenticated encrypted and bound to one organization',()=>{
+ const cipher=seal('secret-refresh-token','key',org);
+ assert.equal(unseal(cipher,'key',org),'secret-refresh-token');
+ assert.throws(()=>unseal(cipher,'key','another-org'));
+ assert.throws(()=>unseal(cipher,'wrong-key',org));
+ assert.ok(!cipher.includes('secret-refresh-token'));
+});
+test('API requires authentication before querying Drive',async()=>{
+ let called=false;const api=createApi({SUPABASE_URL:'https://test',SUPABASE_SERVICE_ROLE_KEY:'service'},async()=>{called=true;throw Error();});
+ const res=response();await api(request('/api/organization?action=asset&organization='+org),res);
+ assert.equal(res.statusCode,401);assert.equal(called,false);
+});
+test('A nonmember cannot use the owner connection',async()=>{
+ const urls=[];const api=createApi({SUPABASE_URL:'https://test',SUPABASE_SERVICE_ROLE_KEY:'service'},async(url)=>{urls.push(url);return {ok:true,status:200,json:async()=>url.includes('/auth/')?{id:'employee'}:[]};});
+ const res=response();await api(request('/api/organization?action=status&organization='+org,{authorization:'Bearer jwt'}),res);
+ assert.equal(res.statusCode,403);assert.equal(urls.length,2);
+});
+test('Denied folder reads never obtain the owner token or fetch bytes',async()=>{
+ const urls=[];const api=createApi({SUPABASE_URL:'https://test',SUPABASE_SERVICE_ROLE_KEY:'service'},async(url)=>{
+ urls.push(url);let data;
+ if(url.includes('/auth/'))data={id:'employee'};
+ else if(url.includes('organization_members'))data=[{organization_role:'member'}];
+ else if(url.includes('/organizations?'))data=[{owner_id:'owner'}];
+ else if(url.includes('documents_index'))data=[{parent_folder_id:'private',google_drive_file_id:'drive-id'}];
+ else if(url.includes('rpc/'))data=false;
+ else throw Error('Unexpected credential/Drive access');
+ return {ok:true,status:200,json:async()=>data};});
+ const res=response();await api(request('/api/organization?action=asset&organization='+org+'&id=doc-1',{authorization:'Bearer jwt'}),res);
+ assert.equal(res.statusCode,403);assert.ok(!urls.some(u=>u.includes('connections')||u.includes('googleapis')));
+});
