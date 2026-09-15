@@ -282,6 +282,21 @@ fs.copyFileSync(
   path.join(distPath, 'drive-stream-sw.js')
 );
 
+// Static SEO & Open Graph assets
+const staticSeoFiles = [
+  ['robots.txt', path.join(distPath, 'robots.txt')],
+  ['sitemap.xml', path.join(distPath, 'sitemap.xml')],
+  ['src/assets/og-image.png', path.join(assetsPath, 'og-image.png')],
+  ['src/assets/og-image.svg', path.join(assetsPath, 'og-image.svg')]
+];
+
+for (const [src, dst] of staticSeoFiles) {
+  const fullSrc = path.join(projectRoot, src);
+  if (fs.existsSync(fullSrc)) {
+    fs.copyFileSync(fullSrc, dst);
+  }
+}
+
 fs.writeFileSync(destPath, html, 'utf8');
 fs.writeFileSync(path.join(projectRoot, 'index.html'), html, 'utf8');
 fs.copyFileSync(srcPath, path.join(projectRoot, 'DocHub-v2.2.html'));

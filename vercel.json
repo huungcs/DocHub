@@ -1,11 +1,10 @@
 {
-  "name": "dochub",
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
   "cleanUrls": true,
   "rewrites": [
     {
-      "source": "/((?!assets/).*)",
+      "source": "/((?!assets/|robots\\.txt|sitemap\\.xml|favicon\\.ico|drive-stream-sw\\.js).*)",
       "destination": "/index.html"
     }
   ]
