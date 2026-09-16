@@ -283,10 +283,7 @@ const authUiScript = `
           localStorage.setItem('dochub.demo_mode', 'true');
         }
         document.documentElement.classList.add('demo-mode-active');
-        lockWorkspace(false);
-        if (statusBadge) statusBadge.style.display = '';
-        if (statusText) statusText.textContent = 'Bản trải nghiệm (Dữ liệu mẫu)';
-        if (dot) dot.style.background = 'var(--amber)';
+        location.reload();
       });
     }
 

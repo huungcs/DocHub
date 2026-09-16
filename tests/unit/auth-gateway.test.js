@@ -49,5 +49,13 @@ test('IndexedDB file cache is namespaced by Supabase user id', () => {
 test('Auth gateway includes a button to enter demo mode with pre-existing sample data', () => {
   assert.match(template, /id="btnEnterDemo"/);
   assert.match(buildScript, /sessionStorage\.setItem\('dochub\.demo_mode', 'true'\)/);
+  assert.match(buildScript, /document\.documentElement\.classList\.add\('demo-mode-active'\);\s*location\.reload\(\)/);
+  assert.match(template, /const cloudAccount=isDemoSession\?null:/);
+  assert.match(template, /async function syncCloudState\(\) \{\s*if\(isDemoSession\) return;/);
   assert.match(buildScript, /btnEnterDemo/);
+});
+
+test('Workspace resolves its initial folder without calling helpers before initialization', () => {
+  assert.match(template, /const preferredFolder = state\.folders\.find/);
+  assert.doesNotMatch(template, /const defaultFolder = \(cloudAccount \|\| !active\(folder/);
 });

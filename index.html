@@ -2442,7 +2442,7 @@ window.DocHubMedia={init,open,typeOf,getSession:()=>session};
     } catch (_) {}
   }
   const localState=loadState();
-  const cloudAccount=window.DocHubAPI?.connected?window.DocHubAPI.user:(isDemoSession?null:authAccount);
+  const cloudAccount=isDemoSession?null:(window.DocHubAPI?.connected?window.DocHubAPI.user:authAccount);
   let state=localState&&validState(localState)?localState:cloudAccount?createCloudWorkspace(cloudAccount):createSeed();
   if (cloudAccount) {
     if (state && Array.isArray(state.folders)) {
@@ -2472,7 +2472,8 @@ window.DocHubMedia={init,open,typeOf,getSession:()=>session};
     }
   }
   upgradeSamples();
-  const defaultFolder = (cloudAccount || !active(folder(state.preferences.lastFolder))) ? 'all' : (state.preferences.lastFolder || 'all');
+  const preferredFolder = state.folders.find(item => item.id === state.preferences.lastFolder);
+  const defaultFolder = (cloudAccount || !preferredFolder || preferredFolder.deletedAt) ? 'all' : preferredFolder.id;
   const ui={
     folder: defaultFolder,
     expanded: new Set(state.preferences.expanded?.filter(id => !DEMO_FOLDER_UIDS.includes(id)) || ['all']),
@@ -4141,6 +4142,7 @@ function openHelp() {
     if(storageWarning)setTimeout(()=>toast(storageWarning,'warning'),350);
     document.dispatchEvent(new Event('dochub:ready'));
     async function syncCloudState() {
+      if(isDemoSession) return;
       if(!window.DocHubAPI?.loadState) return;
       try {
         const serverState = await window.DocHubAPI.loadState();
@@ -4636,10 +4638,7 @@ function openHelp() {
           localStorage.setItem('dochub.demo_mode', 'true');
         }
         document.documentElement.classList.add('demo-mode-active');
-        lockWorkspace(false);
-        if (statusBadge) statusBadge.style.display = '';
-        if (statusText) statusText.textContent = 'Bản trải nghiệm (Dữ liệu mẫu)';
-        if (dot) dot.style.background = 'var(--amber)';
+        location.reload();
       });
     }
 
