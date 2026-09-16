@@ -809,14 +809,14 @@ body.has-uploads.upload-minimized .toast-stack{bottom:90px}
   .toast-stack{right:15px;bottom:max(20px,env(safe-area-inset-bottom));width:calc(100vw - 30px)}
   body.has-selection .toast-stack{bottom:80px}
   .toast{font-size:11px;padding:12px}
-  .upload-center{left:12px;right:12px;bottom:calc(var(--m-dock,76px) + env(safe-area-inset-bottom,0px) + 10px);width:auto;border-radius:18px}
-  body.m-modal-open .upload-center{bottom:calc(12px + env(safe-area-inset-bottom,0px))}
+  .upload-center{left:12px;right:12px;bottom:calc(106px + env(safe-area-inset-bottom,0px));width:auto;border-radius:18px}
+  body.m-modal-open .upload-center{bottom:calc(16px + env(safe-area-inset-bottom,0px))}
   .upload-list{max-height:min(34dvh,250px)}
   .upload-center-head{height:52px;padding:0 10px 0 14px}.upload-job{padding:10px 8px}.upload-job-name{font-size:12px}.upload-job-meta{font-size:10px}
-  body.has-uploads .toast-stack{bottom:calc(var(--m-dock,76px) + env(safe-area-inset-bottom,0px) + min(34dvh,250px) + 72px)}
-  body.has-uploads.upload-minimized .toast-stack{bottom:calc(var(--m-dock,76px) + env(safe-area-inset-bottom,0px) + 65px)}
-  .upload-mini-badge{right:14px;bottom:calc(var(--m-dock,76px) + env(safe-area-inset-bottom,0px) + 12px);z-index:108;padding:4px 13px 4px 4px}
-  body.m-modal-open .upload-mini-badge{bottom:calc(12px + env(safe-area-inset-bottom,0px))}
+  body.has-uploads .toast-stack{bottom:calc(106px + min(34dvh,250px) + 72px + env(safe-area-inset-bottom,0px))!important}
+  body.has-uploads.upload-minimized .toast-stack{bottom:calc(170px + env(safe-area-inset-bottom,0px))!important}
+  .upload-mini-badge{right:16px;bottom:calc(106px + env(safe-area-inset-bottom,0px));z-index:108;padding:4px 13px 4px 4px}
+  body.m-modal-open .upload-mini-badge{bottom:calc(16px + env(safe-area-inset-bottom,0px))}
   .upload-mini-circle{width:40px;height:40px}
   .upload-mini-speed{font-size:11.5px}
   .upload-mini-status{font-size:9.5px}
@@ -1225,6 +1225,10 @@ input[type="checkbox"]:disabled {opacity:.45;cursor:not-allowed}
   .selection-bar [data-action=delete-selected] {color:var(--red);background:var(--red-soft);border-color:transparent}
   body.m-modal-open .selection-bar {visibility:hidden}
   .toast-stack,body.has-selection .toast-stack {left:12px;right:12px;width:auto;bottom:calc(var(--m-dock) + env(safe-area-inset-bottom,0px) + 10px)}
+  body.has-uploads .toast-stack {bottom:calc(106px + min(34dvh,250px) + 72px + env(safe-area-inset-bottom,0px))!important}
+  body.has-uploads.upload-minimized .toast-stack {bottom:calc(170px + env(safe-area-inset-bottom,0px))!important}
+  .upload-mini-badge {bottom:calc(106px + env(safe-area-inset-bottom,0px))}
+  .upload-center {bottom:calc(106px + env(safe-area-inset-bottom,0px))}
   body.m-modal-open .toast-stack {bottom:calc(18px + env(safe-area-inset-bottom,0px))}
   .toast {font-size:13px;line-height:1.5;padding:13px;border-radius:14px}
   .toast button {min-width:44px;min-height:44px}
