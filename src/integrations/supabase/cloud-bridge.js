@@ -48,7 +48,15 @@ const DEMO_FOLDER_UIDS = Object.freeze([
   async function backend(action,options={}) {
     const {data,error}=await supabase.auth.getSession();
     if(error||!data?.session?.access_token)throw new Error('Vui lòng đăng nhập lại.');
-    const response=await fetch(`/api/organization?action=${action}&organization=${encodeURIComponent(organization.id)}`,{...options,headers:{Authorization:`Bearer ${data.session.access_token}`,...options.headers}});
+    let response;
+    try {
+      response=await fetch(`/api/organization?action=${action}&organization=${encodeURIComponent(organization.id)}`,{...options,headers:{Authorization:`Bearer ${data.session.access_token}`,...options.headers}});
+    } catch(fetchErr) {
+      if(fetchErr?.name==='AbortError')throw fetchErr;
+      const netErr=new Error('Mất kết nối mạng tới máy chủ DocHub. Vui lòng kiểm tra đường truyền.');
+      netErr.cause=fetchErr;
+      throw netErr;
+    }
     if(!response.ok){const payload=await response.json().catch(()=>({}));throw new Error(payload.error||'Không kết nối được kho doanh nghiệp.');}
     return response;
   }
@@ -862,12 +870,69 @@ const DEMO_FOLDER_UIDS = Object.freeze([
     await api.requirePermission(parentFolderId, 'create');
     if(organizationBackend){
       const ext=options.ext||blob.name?.split('.').pop()||'';
-      const start=await (await backend('upload-start',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id,folder:parentFolderId,name:options.fileName||blob.name||id,ext,mime:blob.type,bytes:blob.size}),signal})).json();
-      let complete=false;
-      for(let offset=0;offset<blob.size;offset+=start.chunkSize){
-        const end=Math.min(blob.size,offset+start.chunkSize);
-        const result=await (await backend('upload-chunk&upload='+encodeURIComponent(start.id),{method:'PUT',headers:{'Content-Type':'application/octet-stream','Content-Range':`bytes ${offset}-${end-1}/${blob.size}`},body:blob.slice(offset,end),signal})).json();
-        complete=result.complete;onProgress?.({phase:'uploading',loaded:end,total:blob.size,percent:Math.round(end/blob.size*100)});
+      let start=null,startErr=null;
+      for(let sAttempt=1;sAttempt<=3;sAttempt++){
+        if(signal?.aborted){const err=new Error('Đã hủy tải tệp lên.');err.name='AbortError';throw err;}
+        try{
+          const res=await backend('upload-start',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id,folder:parentFolderId,name:options.fileName||blob.name||id,ext,mime:blob.type,bytes:blob.size}),signal});
+          start=await res.json();break;
+        }catch(err){
+          if(err?.name==='AbortError')throw err;
+          startErr=err;
+          if(sAttempt<3)await new Promise(r=>setTimeout(r,600*Math.pow(2,sAttempt-1)));
+        }
+      }
+      if(!start)throw new Error(startErr?.message||'Không thể khởi tạo phiên tải lên Drive.');
+
+      const chunkSize=start.chunkSize||2*1024*1024;
+      let complete=false,offset=0;
+      while(offset<blob.size){
+        if(signal?.aborted){const err=new Error('Đã hủy tải tệp lên.');err.name='AbortError';throw err;}
+        const end=Math.min(blob.size,offset+chunkSize);
+        let chunkOk=false,lastErr=null;
+
+        for(let attempt=1;attempt<=5;attempt++){
+          if(signal?.aborted){const err=new Error('Đã hủy tải tệp lên.');err.name='AbortError';throw err;}
+          if(attempt>1){
+            onProgress?.({phase:'retrying',loaded:offset,total:blob.size,percent:Math.round((offset/blob.size)*100),attempt});
+            const backoff=Math.min(8000,800*Math.pow(2,attempt-2));
+            await new Promise(r=>setTimeout(r,backoff));
+          }
+          try{
+            onProgress?.({phase:'uploading',loaded:offset,total:blob.size,percent:Math.round((offset/blob.size)*100)});
+            const resp=await backend('upload-chunk&upload='+encodeURIComponent(start.id),{method:'PUT',headers:{'Content-Type':'application/octet-stream','Content-Range':`bytes ${offset}-${end-1}/${blob.size}`},body:blob.slice(offset,end),signal});
+            const result=await resp.json();
+            complete=result.complete===true;
+            if(complete){
+              offset=blob.size;chunkOk=true;
+              onProgress?.({phase:'uploading',loaded:blob.size,total:blob.size,percent:100});
+              break;
+            }
+            if(result.range){
+              const m=/bytes=(\d+)-(\d+)/.exec(result.range);
+              if(m){
+                const verifiedNext=Number(m[2])+1;
+                if(verifiedNext>offset){
+                  offset=verifiedNext;chunkOk=true;
+                  onProgress?.({phase:'uploading',loaded:offset,total:blob.size,percent:Math.round((offset/blob.size)*100)});
+                  break;
+                }
+              }
+            }
+            offset=end;chunkOk=true;
+            onProgress?.({phase:'uploading',loaded:offset,total:blob.size,percent:Math.round((offset/blob.size)*100)});
+            break;
+          }catch(err){
+            if(err?.name==='AbortError')throw err;
+            lastErr=err;
+            console.warn(`DocHub: Tải khối ${offset}-${end} gặp sự cố (lần ${attempt}/5):`,err.message||err);
+          }
+        }
+
+        if(!chunkOk){
+          const msg=lastErr?.message&&!/Failed to fetch/i.test(lastErr.message)?lastErr.message:'Mất kết nối mạng khi đang tải lên. Vui lòng kiểm tra đường truyền và thử lại.';
+          throw new Error(msg);
+        }
       }
       if(!complete)throw new Error('Kho doanh nghiệp chưa xác nhận tải xong.');
       return {driveStored:true,cached:false};

@@ -184,15 +184,20 @@ function createApi(env=process.env,fetcher=fetch,logger=console){
     await allowed(c,s.folder_uid,'create');
     const parts=/^bytes (\d+)-(\d+)\/(\d+)$/.exec(req.headers['content-range']||'');
     if(!parts||Number(parts[3])!==Number(s.bytes)||Number(parts[2])>=Number(s.bytes)||Number(parts[2])<Number(parts[1])||Number(parts[1])%262144!==0)throw fail(400,'Khoảng tải không hợp lệ.');
-    let payload;if(Buffer.isBuffer(req.body))payload=req.body;else{const chunks=[];let size=0;for await(const chunk of req){size+=chunk.length;if(size>2*1024*1024)throw fail(413,'Khối tải vượt 2 MB.');chunks.push(chunk);}payload=Buffer.concat(chunks);}
-    if(payload.length>2*1024*1024||payload.length!==Number(parts[2])-Number(parts[1])+1)throw fail(400,'Kích thước khối tải không hợp lệ.');
+    let payload;if(Buffer.isBuffer(req.body))payload=req.body;else if(typeof req.body==='string')payload=Buffer.from(req.body,req.body.includes('\u0000')?'binary':'utf8');else{const chunks=[];let size=0;for await(const chunk of req){size+=chunk.length;if(size>4*1024*1024)throw fail(413,'Khối tải vượt giới hạn.');chunks.push(chunk);}payload=Buffer.concat(chunks);}
+    if(payload.length>4*1024*1024||payload.length!==Number(parts[2])-Number(parts[1])+1)throw fail(400,'Kích thước khối tải không hợp lệ.');
     const token=await ownerToken(c),uploadUrl=unseal(s.encrypted_url,key,id);
     const response=await fetcher(uploadUrl,{method:'PUT',headers:{Authorization:`Bearer ${token}`,'Content-Type':s.mime,'Content-Range':req.headers['content-range']},body:payload,signal:AbortSignal.timeout(60000)});
-    if(response.status===308){result={complete:false};}
+    if(response.status===308){result={complete:false,range:response.headers.get('range')};}
     else if(response.ok){const metadata=await response.json();if(!metadata.id)throw fail(502,'Drive chưa xác nhận tệp.');
      await db('documents_index?on_conflict=user_id,doc_uid',{method:'POST',headers:{Prefer:'resolution=merge-duplicates,return=representation'},body:JSON.stringify({organization_id:c.org,user_id:c.user.id,doc_uid:s.doc_uid,parent_folder_id:s.folder_uid,name:s.name.replace(new RegExp('\\.'+s.ext.replace(/[^a-z0-9]/gi,'')+'$','i'),''),ext:s.ext,bytes:s.bytes,mime_type:s.mime,google_drive_file_id:metadata.id})});
      await db(`organization_uploads?id=eq.${id}`,{method:'DELETE'});result={complete:true};
-    }else throw fail(502,'Drive chưa nhận khối tải. Vui lòng thử tải lại.');
+    }else{
+     const checkRes=await fetcher(uploadUrl,{method:'PUT',headers:{Authorization:`Bearer ${token}`,'Content-Range':`bytes */${s.bytes}`},signal:AbortSignal.timeout(15000)}).catch(()=>null);
+     if(checkRes&&checkRes.status===308){result={complete:false,range:checkRes.headers.get('range')};}
+     else if(checkRes&&checkRes.ok){const metadata=await checkRes.json().catch(()=>({}));if(metadata.id){await db('documents_index?on_conflict=user_id,doc_uid',{method:'POST',headers:{Prefer:'resolution=merge-duplicates,return=representation'},body:JSON.stringify({organization_id:c.org,user_id:c.user.id,doc_uid:s.doc_uid,parent_folder_id:s.folder_uid,name:s.name.replace(new RegExp('\\.'+s.ext.replace(/[^a-z0-9]/gi,'')+'$','i'),''),ext:s.ext,bytes:s.bytes,mime_type:s.mime,google_drive_file_id:metadata.id})});await db(`organization_uploads?id=eq.${id}`,{method:'DELETE'});result={complete:true};}else throw fail(502,'Drive chưa nhận khối tải. Vui lòng thử tải lại.');}
+     else throw fail(502,'Drive chưa nhận khối tải. Vui lòng thử tải lại.');
+    }
    }else if(action==='asset'&&['GET','HEAD'].includes(req.method)){
     const doc=await document(c,url.searchParams.get('id'),'read'),token=await ownerToken(c);
     const range=req.headers.range;if(range&&!/^bytes=\d*-\d*$/.test(range))throw fail(416,'Khoảng dữ liệu không hợp lệ.');
