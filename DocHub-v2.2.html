@@ -445,6 +445,11 @@ dialog[open]{animation:dialog-in .17s ease-out}
 .checkbox-list{display:grid;grid-template-columns:1fr 1fr;gap:7px;max-height:210px;overflow:auto;padding:3px}
 .checkbox-option{display:flex;gap:8px;align-items:center;font-size:12px;padding:8px;border:1px solid var(--line);border-radius:7px;cursor:pointer}
 .checkbox-option input{margin:0}
+input[type="radio"][name="quickRole"]{appearance:none;-webkit-appearance:none;width:18px;height:18px;border:1.5px solid #111;border-radius:50%;background:#fff;display:inline-grid;place-content:center;box-shadow:none}
+input[type="radio"][name="quickRole"]::before{content:"";width:8px;height:8px;border-radius:50%;background:#111;transform:scale(0)}
+input[type="radio"][name="quickRole"]:checked::before{transform:scale(1)}
+input[type="radio"][name="quickRole"]:focus-visible{outline:2px solid var(--brand);outline-offset:3px}
+
 .inline-check{display:flex;gap:9px;align-items:flex-start;font-size:12px;cursor:pointer;line-height:1.7}
 .inline-check input{margin-top:2px}
 .field>label.inline-check{display:flex;align-items:center;gap:10px;min-height:44px;margin:0;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--surface-soft);font-size:12px;font-weight:500;line-height:1.5;cursor:pointer}
@@ -565,11 +570,11 @@ dialog[open]{animation:dialog-in .17s ease-out}
 .row-meta{font-size:10px;color:var(--muted);max-width:160px}
 .group-badges{display:flex;gap:4px;flex-wrap:wrap;margin-top:6px}
 .group-badges .badge{font-size:9px;padding:2px 6px}
-.stat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:13px;margin-bottom:22px}
-.stat-card{padding:18px;border:1px solid var(--line);border-radius:10px}
+.stat-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-bottom:22px}
+.stat-card{aspect-ratio:1;min-width:0;box-sizing:border-box;padding:12px;border:1px solid var(--line);border-radius:14px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:7px;background:var(--surface)}
 .stat-card>.icon{color:var(--brand);width:21px;height:21px}
-.stat-card strong{font-size:25px;color:var(--ink);font-weight:650;display:block;margin:10px 0 1px}
-.stat-card small{font-size:10px;color:var(--muted)}
+.stat-card strong{font-size:25px;color:var(--ink);font-weight:650;display:block;margin:0;line-height:1.15}
+.stat-card small{font-size:11px;line-height:1.35;color:var(--muted)}
 .setting-row{display:flex;align-items:center;justify-content:space-between;gap:18px;padding:15px 0;border-bottom:1px solid var(--line)}
 .setting-row:last-child{border-bottom:0}
 .setting-row strong{display:block;color:var(--ink);font-size:12px;font-weight:550}
@@ -665,10 +670,37 @@ dialog[open]{animation:dialog-in .17s ease-out}
 .toast .text-button{white-space:nowrap;font-size:11px}
 .toast .icon-btn{width:24px;height:26px}
 .toast .icon-btn .icon{width:14px;height:14px}
-.upload-center{position:fixed;right:26px;bottom:25px;z-index:109;width:min(390px,calc(100vw - 30px));background:var(--surface);border:1px solid var(--line);border-radius:16px;box-shadow:var(--dialog-shadow);overflow:hidden;animation:dialog-in .2s ease-out}
-.upload-center[hidden]{display:none}.upload-center-head{height:54px;padding:0 16px;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--line)}.upload-center-head>.icon{width:19px;height:19px;color:var(--brand)}.upload-center-head strong{font-size:13px;flex:1}.upload-center-head small{font-size:10px;color:var(--muted)}
+.upload-center{position:fixed;right:26px;bottom:25px;z-index:109;width:min(390px,calc(100vw - 30px));background:var(--surface);border:1px solid var(--line-strong);border-radius:18px;box-shadow:var(--dialog-shadow);overflow:hidden;animation:dialog-in .2s ease-out;backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px)}
+.upload-center[hidden]{display:none}.upload-center-head{height:56px;padding:0 14px 0 16px;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--line)}.upload-center-head>.icon{width:20px;height:20px;color:var(--brand);flex-shrink:0}.upload-head-info{flex:1;min-width:0}.upload-head-info strong{font-size:13px;font-weight:700;display:block;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.upload-head-sub{display:flex;align-items:center;gap:8px;margin-top:2px}.upload-head-sub small{font-size:10.5px;color:var(--muted);white-space:nowrap}.upload-speed-badge{font-size:10px;font-weight:700;color:var(--brand);background:var(--brand-soft);padding:1px 7px;border-radius:999px;white-space:nowrap}.upload-speed-badge[hidden]{display:none}
 .upload-list{max-height:310px;overflow:auto;padding:5px}.upload-job{padding:11px 10px;border-radius:11px;display:grid;grid-template-columns:36px minmax(0,1fr) 30px;gap:9px;align-items:center}.upload-job+.upload-job{border-top:1px solid var(--line);border-radius:0}.upload-job-icon{width:34px;height:34px;border-radius:9px;background:var(--brand-soft);color:var(--brand);display:grid;place-items:center}.upload-job-icon>.icon{width:17px;height:17px}.upload-job-main{min-width:0}.upload-job-name{font-size:11px;font-weight:650;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.upload-job-meta{display:flex;justify-content:space-between;gap:10px;margin-top:4px;color:var(--muted);font-size:9px}.upload-progress{height:4px;margin-top:7px;border-radius:999px;background:var(--surface-soft);overflow:hidden}.upload-progress>span{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--brand),#6f91f8);border-radius:inherit;transition:width .18s ease}.upload-job.complete .upload-progress>span{background:var(--green)}.upload-job.error .upload-progress>span{background:var(--red)}.upload-job.local .upload-progress>span{background:var(--amber)}.upload-job-action{width:30px;height:30px}.upload-job-action>.icon{width:15px;height:15px}.upload-job.complete .upload-job-icon{background:#e9f6f0;color:var(--green)}.upload-job.error .upload-job-icon{background:#fff0f1;color:var(--red)}.upload-job.local .upload-job-icon{background:#fff7e7;color:var(--amber)}
 body.has-uploads .toast-stack{bottom:415px}
+body.has-uploads.upload-minimized .toast-stack{bottom:90px}
+.upload-mini-badge{position:fixed;right:26px;bottom:25px;z-index:109;display:inline-flex;align-items:center;gap:10px;padding:5px 15px 5px 5px;background:var(--surface);border:1px solid var(--line-strong);border-radius:999px;box-shadow:0 10px 28px -4px rgba(15,23,42,0.18),0 3px 8px -2px rgba(15,23,42,0.08);cursor:pointer;user-select:none;backdrop-filter:blur(16px) saturate(180%);-webkit-backdrop-filter:blur(16px) saturate(180%);transition:transform .2s cubic-bezier(0.34,1.56,0.64,1),box-shadow .2s ease,border-color .2s ease;animation:mini-badge-pop .25s cubic-bezier(0.16,1,0.3,1)}
+.upload-mini-badge[hidden]{display:none!important}
+.upload-mini-badge:hover{transform:translateY(-2px) scale(1.02);box-shadow:0 14px 34px -4px rgba(15,23,42,0.24),0 5px 12px -2px rgba(15,23,42,0.1);border-color:var(--brand)}
+.upload-mini-badge:active{transform:scale(0.97)}
+.upload-mini-circle{position:relative;width:44px;height:44px;border-radius:50%;background:var(--surface-soft);display:grid;place-items:center;flex-shrink:0}
+.upload-circle-svg{position:absolute;inset:0;width:100%;height:100%;transform:rotate(-90deg)}
+.upload-circle-track{stroke:var(--line-strong);opacity:0.55}
+.upload-circle-bar{stroke:var(--brand);stroke-linecap:round;transition:stroke-dashoffset .22s ease,stroke .22s ease}
+.upload-mini-badge.complete .upload-circle-bar{stroke:var(--green)}
+.upload-mini-badge.error .upload-circle-bar{stroke:var(--red)}
+.upload-mini-center-icon{position:relative;z-index:1;display:grid;place-items:center;color:var(--brand);transition:color .2s ease}
+.upload-mini-center-icon>.icon{width:18px;height:18px}
+.upload-mini-badge.uploading .upload-icon-spin{animation:upload-pulse-icon 1.3s ease-in-out infinite}
+@keyframes upload-pulse-icon{0%,100%{transform:translateY(0)}50%{transform:translateY(-2.5px)}}
+.upload-mini-badge.complete .upload-mini-center-icon{color:var(--green)}
+.upload-mini-badge.error .upload-mini-center-icon{color:var(--red)}
+.upload-mini-count{position:absolute;top:-2px;right:-2px;min-width:18px;height:18px;padding:0 4px;border-radius:999px;background:var(--brand);color:#fff;font-size:10px;font-weight:700;display:grid;place-items:center;box-shadow:0 2px 4px rgba(0,0,0,0.2);border:1.5px solid var(--surface);line-height:1}
+.upload-mini-count[hidden]{display:none}
+.upload-mini-badge.complete .upload-mini-count{background:var(--green)}
+.upload-mini-badge.error .upload-mini-count{background:var(--red)}
+.upload-mini-pill{display:flex;flex-direction:column;justify-content:center;min-width:0;line-height:1.25}
+.upload-mini-speed{font-size:12px;font-weight:700;color:var(--ink);letter-spacing:-.2px;display:flex;align-items:center;gap:5px}
+.upload-speed-dot{display:inline-block;width:6.5px;height:6.5px;border-radius:50%;background:var(--green);box-shadow:0 0 7px var(--green);animation:speed-dot-pulse 1.2s infinite ease-in-out}
+@keyframes speed-dot-pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.4;transform:scale(0.85)}}
+.upload-mini-status{font-size:10px;color:var(--muted);font-weight:500;white-space:nowrap;margin-top:1px}
+@keyframes mini-badge-pop{from{opacity:0;transform:translateY(12px) scale(0.9)}to{opacity:1;transform:translateY(0) scale(1)}}
 .shortcut-list{margin-top:20px}
 .shortcut-list>div{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--line);font-size:12px}
 .shortcut-list kbd{padding:3px 7px;border:1px solid var(--line-strong);background:var(--surface-soft);border-radius:5px;color:var(--muted);font:10px var(--font)}
@@ -764,11 +796,17 @@ body.has-uploads .toast-stack{bottom:415px}
   .toast-stack{right:15px;bottom:max(20px,env(safe-area-inset-bottom));width:calc(100vw - 30px)}
   body.has-selection .toast-stack{bottom:80px}
   .toast{font-size:11px;padding:12px}
-  .upload-center{left:12px;right:12px;bottom:calc(var(--m-dock,76px) + env(safe-area-inset-bottom,0px) + 10px);width:auto;border-radius:16px}
+  .upload-center{left:12px;right:12px;bottom:calc(var(--m-dock,76px) + env(safe-area-inset-bottom,0px) + 10px);width:auto;border-radius:18px}
   body.m-modal-open .upload-center{bottom:calc(12px + env(safe-area-inset-bottom,0px))}
-  .upload-list{max-height:min(42dvh,310px)}
-  .upload-center-head{height:50px}.upload-job{padding:10px 8px}.upload-job-name{font-size:12px}.upload-job-meta{font-size:10px}
-  body.has-uploads .toast-stack{bottom:calc(var(--m-dock,76px) + env(safe-area-inset-bottom,0px) + min(42dvh,310px) + 72px)}
+  .upload-list{max-height:min(34dvh,250px)}
+  .upload-center-head{height:52px;padding:0 10px 0 14px}.upload-job{padding:10px 8px}.upload-job-name{font-size:12px}.upload-job-meta{font-size:10px}
+  body.has-uploads .toast-stack{bottom:calc(var(--m-dock,76px) + env(safe-area-inset-bottom,0px) + min(34dvh,250px) + 72px)}
+  body.has-uploads.upload-minimized .toast-stack{bottom:calc(var(--m-dock,76px) + env(safe-area-inset-bottom,0px) + 65px)}
+  .upload-mini-badge{right:14px;bottom:calc(var(--m-dock,76px) + env(safe-area-inset-bottom,0px) + 12px);z-index:108;padding:4px 13px 4px 4px}
+  body.m-modal-open .upload-mini-badge{bottom:calc(12px + env(safe-area-inset-bottom,0px))}
+  .upload-mini-circle{width:40px;height:40px}
+  .upload-mini-speed{font-size:11.5px}
+  .upload-mini-status{font-size:9.5px}
   dialog{max-width:calc(100vw - 24px);max-height:calc(100dvh - 24px);border-radius:13px}
   .form-dialog{width:calc(100vw - 24px)}
   .dialog-heading{padding:18px}
@@ -832,9 +870,9 @@ body.has-uploads .toast-stack{bottom:415px}
   .source-list{font-size:10px}
   .matrix-details{font-size:10px}
   .stat-grid{gap:8px}
-  .stat-card{padding:14px}
+  .stat-card{padding:8px;gap:5px;border-radius:12px}
   .stat-card strong{font-size:23px}
-  .stat-card small{font-size:9px}
+  .stat-card small{font-size:10px}
   .settings-list-row{padding:13px;gap:8px;flex-wrap:wrap}
   .settings-list-row .principal strong{font-size:11px}
   .settings-list-row .row-meta{display:none}
@@ -1787,8 +1825,35 @@ body.auth-locked{overflow:hidden}
   </div>
 </div>
 <div id="selectionBar" class="selection-bar" hidden></div>
+<div id="uploadMiniBadge" class="upload-mini-badge" hidden role="button" tabindex="0" data-action="open-uploads" aria-label="Mở danh sách tiến trình tải tệp" title="Bấm để xem chi tiết tiến trình tải tệp">
+  <div class="upload-mini-circle">
+    <svg class="upload-circle-svg" viewBox="0 0 44 44" aria-hidden="true">
+      <circle class="upload-circle-track" cx="22" cy="22" r="18" fill="none" stroke-width="3.5" />
+      <circle class="upload-circle-bar" id="uploadCircleBar" cx="22" cy="22" r="18" fill="none" stroke-width="3.5" stroke-dasharray="113.1" stroke-dashoffset="113.1" />
+    </svg>
+    <div class="upload-mini-center-icon" id="uploadMiniIcon">
+      <svg class="icon upload-icon-spin" aria-hidden="true"><use href="#i-upload"/></svg>
+    </div>
+    <span class="upload-mini-count" id="uploadMiniCount" hidden>0</span>
+  </div>
+  <div class="upload-mini-pill" id="uploadMiniPill">
+    <div class="upload-mini-speed" id="uploadMiniSpeed"><span class="upload-speed-dot"></span>0 KB/s</div>
+    <div class="upload-mini-status" id="uploadMiniStatus">Đang tải · 0%</div>
+  </div>
+</div>
 <section id="uploadCenter" class="upload-center" aria-label="Tiến trình tải tệp" hidden>
-  <header class="upload-center-head"><svg class="icon" aria-hidden="true"><use href="#i-upload"/></svg><strong>Đang tải lên</strong><small id="uploadSummary"></small><button class="icon-btn" data-action="close-uploads" aria-label="Thu nhỏ tiến trình"><svg class="icon" aria-hidden="true"><use href="#i-close"/></svg></button></header>
+  <header class="upload-center-head">
+    <svg class="icon" aria-hidden="true"><use href="#i-upload"/></svg>
+    <div class="upload-head-info">
+      <strong>Đang tải lên</strong>
+      <div class="upload-head-sub">
+        <small id="uploadSummary"></small>
+        <span id="uploadSpeedBadge" class="upload-speed-badge" hidden></span>
+      </div>
+    </div>
+    <button class="icon-btn" data-action="minimize-uploads" aria-label="Thu nhỏ thành biểu tượng tròn" title="Thu nhỏ thành biểu tượng tròn"><svg class="icon" aria-hidden="true"><use href="#i-minus"/></svg></button>
+    <button class="icon-btn" data-action="close-uploads" aria-label="Thu nhỏ tiến trình" title="Đóng danh sách"><svg class="icon" aria-hidden="true"><use href="#i-close"/></svg></button>
+  </header>
   <div id="uploadList" class="upload-list" aria-live="polite"></div>
 </section>
 <div id="toasts" class="toast-stack" aria-live="polite" aria-atomic="false"></div>
@@ -2926,7 +2991,7 @@ window.DocHubMedia={init,open,typeOf,getSession:()=>session};
   }
   function generalPage() {
     return `${sectionHeader('Không gian làm việc','Tổng quan dữ liệu và thiết lập chung của bản mẫu.')}
-      <div class="stat-grid"><div class="stat-card">${icon('folder')}<strong>${activeFolders().length-1}</strong><small>Thư mục đang dùng</small></div><div class="stat-card">${icon('file')}<strong>${state.documents.filter(active).length}</strong><small>Tài liệu trong hệ thống</small></div><div class="stat-card">${icon('users')}<strong>${state.users.length}</strong><small>Người dùng mẫu</small></div></div>
+      <div class="stat-grid"><div class="stat-card">${icon('folder')}<strong>${activeFolders().length-1}</strong><small>Thư mục</small></div><div class="stat-card">${icon('file')}<strong>${state.documents.filter(active).length}</strong><small>Tài liệu</small></div><div class="stat-card">${icon('users')}<strong>${state.users.length}</strong><small>Thành viên</small></div></div>
       <section class="settings-card"><div class="settings-card-heading"><h3>Thông tin chung</h3></div>
         <div class="setting-row"><div><strong>Tên không gian làm việc</strong><small>${e(state.preferences.workspaceName)}</small></div><button class="btn sm" data-action="rename-workspace">${icon('edit')}Chỉnh sửa</button></div>
         <div class="setting-row"><div><strong>Hình thức lưu trữ</strong><small>Chạy server.py: lưu vào thư mục data trên máy chủ cục bộ. Mở HTML riêng: lưu trong trình duyệt, khi được hỗ trợ.</small></div><span class="badge blue">Cục bộ</span></div>
@@ -3263,7 +3328,8 @@ window.DocHubMedia={init,open,typeOf,getSession:()=>session};
     job.pending=true;job.status='queued';renderUploadCenter();
     return scheduleUpload(job).finally(()=>{job.pending=false;renderUploadCenter();});
   }
-  let uploadPanelDismissed=false,uploadHideTimer;
+  let uploadPanelDismissed=false,uploadPanelMinimized=false,uploadHideTimer,uploadAutoMinimizeTimer;
+  const uploadSpeedTracker={lastTime:0,lastLoaded:0,speed:0};
   const uploadPhaseLabel=job=>({queued:'Đang chờ',caching:'Đang lưu an toàn',connecting:'Đang kết nối Drive',preparing:'Đang chuẩn bị Drive',uploading:`Đang tải ${job.percent||0}%`,retrying:`Mất mạng · thử lại lần ${job.attempt||1}`,complete:'Đã tải lên Drive',local:'Đã lưu trên thiết bị',error:'Tải lên thất bại',cancelled:'Đã hủy'})[job.status]||'Đang xử lý';
   function transferMeta(job) {
     if(job.status==='error')return job.error||'Có lỗi xảy ra';
@@ -3274,17 +3340,119 @@ window.DocHubMedia={init,open,typeOf,getSession:()=>session};
     return parts.join(' · ');
   }
   function renderUploadCenter() {
-    const host=$('#uploadCenter'),list=$('#uploadList');if(!host||!list)return;
+    const host=$('#uploadCenter'),list=$('#uploadList'),mini=$('#uploadMiniBadge');if(!host||!list)return;
     const jobs=[...uploadJobs.values()],active=jobs.filter(j=>!['complete','local','error','cancelled'].includes(j.status));
     clearTimeout(uploadHideTimer);
     if(jobs.length&&!active.length&&!jobs.some(j=>j.running)&&!uploadPanelDismissed&&!jobs.some(j=>j.status==='error')){
-      uploadHideTimer=setTimeout(()=>{for(const [id,job] of uploadJobs)if(!job.running)uploadJobs.delete(id);renderUploadCenter();},jobs.some(j=>j.status==='local')?12000:3500);
+      uploadHideTimer=setTimeout(()=>{
+        for(const [id,job] of uploadJobs)if(!job.running)uploadJobs.delete(id);
+        uploadPanelMinimized=false;
+        renderUploadCenter();
+      },jobs.some(j=>j.status==='local')?12000:3500);
     }
-    host.hidden=!jobs.length||uploadPanelDismissed;
-    document.body.classList.toggle('has-uploads',jobs.length>0&&!uploadPanelDismissed);
-    $('.upload-center-head strong',host).textContent=active.length?'Đang tải lên':jobs.some(j=>j.status==='error')?'Có tệp tải thất bại':jobs.some(j=>j.status==='local')?'Đã lưu máy · chưa lên Drive':'Đã hoàn tất tải lên';
+    const hasUploads=jobs.length>0&&!uploadPanelDismissed;
+    const isMinimized=hasUploads&&uploadPanelMinimized;
+    host.hidden=!hasUploads||isMinimized;
+    if(mini)mini.hidden=!isMinimized;
+    document.body.classList.toggle('has-uploads',hasUploads);
+    document.body.classList.toggle('upload-minimized',isMinimized);
+
+    const hasErrors=jobs.some(j=>j.status==='error');
+    const isLocal=jobs.some(j=>j.status==='local');
+    const isComplete=!active.length&&!jobs.some(j=>j.running)&&!hasErrors;
+
+    $('.upload-center-head strong',host).textContent=active.length?'Đang tải lên':hasErrors?'Có tệp tải thất bại':isLocal?'Đã lưu máy · chưa lên Drive':'Đã hoàn tất tải lên';
     $('#uploadSummary').textContent=active.length?`${jobs.filter(j=>j.running).length} đang tải · ${active.filter(j=>!j.running).length} chờ`:`${jobs.filter(j=>j.status==='complete').length}/${jobs.length} lên Drive`;
+
+    const totalBytes=jobs.reduce((s,j)=>s+(j.total||0),0);
+    const totalLoaded=jobs.reduce((s,j)=>s+(j.loaded||0),0);
+    const overallPercent=totalBytes>0?Math.min(100,Math.max(0,Math.round((totalLoaded/totalBytes)*100))):(isComplete?100:0);
+
+    const now=Date.now();
+    if(active.length){
+      if(!uploadSpeedTracker.lastTime){
+        uploadSpeedTracker.lastTime=now;
+        uploadSpeedTracker.lastLoaded=totalLoaded;
+      }else{
+        const dt=(now-uploadSpeedTracker.lastTime)/1000;
+        if(dt>=0.35){
+          const dBytes=Math.max(0,totalLoaded-uploadSpeedTracker.lastLoaded);
+          const instSpeed=dBytes/dt;
+          uploadSpeedTracker.speed=uploadSpeedTracker.speed===0?instSpeed:(uploadSpeedTracker.speed*0.65+instSpeed*0.35);
+          uploadSpeedTracker.lastLoaded=totalLoaded;
+          uploadSpeedTracker.lastTime=now;
+        }
+      }
+    }else{
+      uploadSpeedTracker.speed=0;
+      uploadSpeedTracker.lastTime=0;
+    }
+
+    const currentSpeed=uploadSpeedTracker.speed;
+    const speedBadge=$('#uploadSpeedBadge');
+    if(speedBadge){
+      if(active.length&&currentSpeed>256){
+        speedBadge.textContent=`⚡ ${bytes(currentSpeed)}/giây`;
+        speedBadge.hidden=false;
+      }else{
+        speedBadge.hidden=true;
+      }
+    }
+
     list.innerHTML=jobs.map(job=>{const terminal=['complete','local','error','cancelled'].includes(job.status),retryable=['local','error','cancelled'].includes(job.status),action=terminal?(retryable?'retry-upload':'dismiss-upload'):'cancel-upload';return `<article class="upload-job ${e(job.status)}"><span class="upload-job-icon">${icon(job.status==='complete'?'check':job.status==='error'?'info':'upload')}</span><div class="upload-job-main"><div class="upload-job-name" title="${e(job.fileName)}">${e(job.fileName)}</div><div class="upload-job-meta"><span>${e(uploadPhaseLabel(job))}</span><span>${e(transferMeta(job))}</span></div><div class="upload-progress" role="progressbar" aria-label="Tiến trình tải ${e(job.fileName)}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${job.percent||0}"><span style="width:${Math.max(0,Math.min(100,job.percent||0))}%"></span></div></div><button class="icon-btn upload-job-action" data-action="${action}" data-id="${e(job.id)}" aria-label="${action==='cancel-upload'?'Hủy tải':action==='retry-upload'?'Thử đồng bộ lại':'Ẩn'} ${e(job.fileName)}">${icon(action==='retry-upload'?'restore':'close')}</button></article>`;}).join('');
+
+    if(mini&&isMinimized){
+      mini.classList.toggle('complete',isComplete);
+      mini.classList.toggle('error',hasErrors);
+      mini.classList.toggle('uploading',active.length>0);
+
+      const bar=$('#uploadCircleBar');
+      if(bar){
+        const offset=Math.max(0,113.1-(113.1*overallPercent/100));
+        bar.style.strokeDashoffset=offset;
+      }
+
+      const miniIcon=$('#uploadMiniIcon');
+      if(miniIcon){
+        if(isComplete)miniIcon.innerHTML=icon('check');
+        else if(hasErrors)miniIcon.innerHTML=icon('info');
+        else miniIcon.innerHTML=`<svg class="icon upload-icon-spin" aria-hidden="true"><use href="#i-upload"/></svg>`;
+      }
+
+      const miniCount=$('#uploadMiniCount');
+      if(miniCount){
+        if(active.length>1){
+          miniCount.textContent=active.length;
+          miniCount.hidden=false;
+        }else{
+          miniCount.hidden=true;
+        }
+      }
+
+      const miniSpeed=$('#uploadMiniSpeed');
+      const miniStatus=$('#uploadMiniStatus');
+      const speedCompact=currentSpeed>256?`${bytes(currentSpeed)}/s`:(active.length?'Đang kết nối':'0 KB/s');
+      if(miniSpeed){
+        if(isComplete){
+          miniSpeed.innerHTML=`<span class="upload-speed-dot" style="background:var(--green);box-shadow:0 0 7px var(--green)"></span>Hoàn tất`;
+        }else if(hasErrors){
+          miniSpeed.innerHTML=`<span class="upload-speed-dot" style="background:var(--red);box-shadow:0 0 7px var(--red)"></span>Có lỗi`;
+        }else if(active.length){
+          miniSpeed.innerHTML=`<span class="upload-speed-dot"></span>${speedCompact}`;
+        }else{
+          miniSpeed.innerHTML=`Đang xử lý`;
+        }
+      }
+      if(miniStatus){
+        if(isComplete){
+          miniStatus.textContent=`${jobs.filter(j=>j.status==='complete').length}/${jobs.length} tệp lên Drive`;
+        }else if(hasErrors){
+          miniStatus.textContent=`Bấm xem & thử lại`;
+        }else{
+          miniStatus.textContent=`${overallPercent}% · ${active.length} tệp còn lại`;
+        }
+      }
+    }
   }
   function updateUploadJob(job,progress={}) {job.status=progress.phase||job.status;if(progress.error)job.error=progress.error;job.loaded=Number.isFinite(progress.loaded)?progress.loaded:job.loaded;job.total=Number.isFinite(progress.total)?progress.total:job.total;job.percent=Number.isFinite(progress.percent)?progress.percent:job.percent;job.attempt=progress.attempt||job.attempt;renderUploadCenter();}
   async function executeUploadJob(job) {
@@ -3319,6 +3487,16 @@ window.DocHubMedia={init,open,typeOf,getSession:()=>session};
         uploadJobs.set(job.id,job);jobs.push(job);
       }
       renderUploadCenter();
+      clearTimeout(uploadAutoMinimizeTimer);
+      if(window.innerWidth<=700){
+        uploadAutoMinimizeTimer=setTimeout(()=>{
+          const activeJobs=[...uploadJobs.values()].filter(j=>!['complete','local','error','cancelled'].includes(j.status));
+          if(activeJobs.length&&!uploadPanelDismissed){
+            uploadPanelMinimized=true;
+            renderUploadCenter();
+          }
+        },2200);
+      }
       const results=await Promise.all(jobs.map(job=>runUploadJob(job)));
       results.forEach((ok,index)=>{if(ok){accepted++;if(jobs[index].status==='local')localCount++;}});
       if(accepted){ui.page=1;ui.tab='all';ui.localQuery='';ui.query='';$('#globalSearch').value='';renderWorkspace();toast(`Đã thêm ${accepted} tài liệu vào thư mục.`);}
@@ -3574,7 +3752,9 @@ function openHelp() {
         case 'new-folder':openNewFolder();break;
         case 'new-text':openTextEditor();break;
         case 'upload':$('#fileInput').click();break;
-        case 'close-uploads':uploadPanelDismissed=true;renderUploadCenter();break;
+        case 'minimize-uploads':uploadPanelMinimized=true;clearTimeout(uploadAutoMinimizeTimer);renderUploadCenter();break;
+        case 'open-uploads':uploadPanelMinimized=false;clearTimeout(uploadAutoMinimizeTimer);renderUploadCenter();break;
+        case 'close-uploads':uploadPanelDismissed=true;uploadPanelMinimized=false;clearTimeout(uploadAutoMinimizeTimer);renderUploadCenter();break;
         case 'cancel-upload':{const job=uploadJobs.get(id);if(job){if(job.running)job.controller?.abort();else updateUploadJob(job,{phase:'cancelled'});}break;}
         case 'retry-upload':{const job=uploadJobs.get(id);if(job){uploadPanelDismissed=false;await runUploadJob(job);}break;}
         case 'dismiss-upload':uploadJobs.delete(id);renderUploadCenter();break;
@@ -3698,6 +3878,13 @@ function openHelp() {
         return;
       }
       $('.topbar').classList.add('search-open');$('#globalSearch').focus();return;
+    }
+    if((event.key==='Enter'||event.key===' ')&&target.closest?.('#uploadMiniBadge')){
+      event.preventDefault();
+      uploadPanelMinimized=false;
+      clearTimeout(uploadAutoMinimizeTimer);
+      renderUploadCenter();
+      return;
     }
     const treeNode=target.closest?.('[data-tree-id]');
     if(treeNode && ['ArrowDown','ArrowUp','ArrowLeft','ArrowRight','Home','End'].includes(event.key)) {
