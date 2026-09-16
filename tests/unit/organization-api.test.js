@@ -145,3 +145,29 @@ test('upload-status rechecks folder permission and resumes at the Drive byte ran
  assert.deepEqual(res.data,{complete:false,range:'bytes=0-8388607'});
  assert.equal(permissionChecks,1);
 });
+
+test('upload-chunk uploads byte range without requiring Google token refresh and completes file',async()=>{
+ const uploadId='33333333-3333-3333-3333-333333333333';
+ let tokenRefreshed=false;let uploadedChunk=null;
+ const api=createApi({SUPABASE_URL:'https://test',SUPABASE_SERVICE_ROLE_KEY:'service'},async(url,opts={})=>{
+  if(url.includes('/auth/v1/user'))return {ok:true,status:200,json:async()=>({id:'member'})};
+  if(url.includes('organization_members'))return {ok:true,status:200,json:async()=>([{organization_role:'member'}])};
+  if(url.includes('/organizations?'))return {ok:true,status:200,json:async()=>([{owner_id:'owner'}])};
+  if(url.includes('rpc/dochub_can_folder_action'))return {ok:true,status:200,json:async()=>true};
+  if(url.includes('organization_uploads?id=eq.')&&opts.method==='DELETE')return {ok:true,status:200,json:async()=>[]};
+  if(url.includes('organization_uploads?id=eq.'))return {ok:true,status:200,json:async()=>([{id:uploadId,organization_id:org,user_id:'member',doc_uid:'doc-chunk',folder_uid:'all',name:'chunk.pdf',ext:'pdf',bytes:262144,mime:'application/pdf',expires_at:new Date(Date.now()+60000).toISOString(),encrypted_url:seal('https://www.googleapis.com/upload/session-chunk','service',uploadId)}])};
+  if(url.includes('oauth2.googleapis.com/token')){tokenRefreshed=true;return {ok:true,status:200,json:async()=>({})};}
+  if(url==='https://www.googleapis.com/upload/session-chunk'){
+    uploadedChunk=opts.headers['Content-Range'];
+    return {ok:true,status:200,json:async()=>({id:'drive-file-chunk',size:262144})};
+  }
+  if(url.includes('documents_index?on_conflict='))return {ok:true,status:200,json:async()=>[{id:1}]};
+  throw Error('Unexpected url: '+url);
+ });
+ const chunkData=Buffer.alloc(262144);
+ const res=response();
+ await api(request('/api/organization?action=upload-chunk&organization='+org+'&upload='+uploadId,{authorization:'Bearer jwt','content-range':'bytes 0-262143/262144'},'PUT',chunkData),res);
+ assert.equal(res.data.complete,true);
+ assert.equal(uploadedChunk,'bytes 0-262143/262144');
+ assert.equal(tokenRefreshed,false,'Must not call Google OAuth token refresh on chunk upload');
+});

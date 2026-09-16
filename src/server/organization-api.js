@@ -31,8 +31,12 @@ async function body(req){
  const chunks=[];let size=0;for await(const chunk of req){size+=chunk.length;if(size>1024*1024)throw fail(413,'Yêu cầu quá lớn.');chunks.push(chunk);}
  try{return JSON.parse(Buffer.concat(chunks).toString()||'{}');}catch{throw fail(400,'Dữ liệu không hợp lệ.');}
 }
+function cleanEnv(val){
+ return typeof val==='string'?val.replace(/\\r|\\n|[\r\n]/g,'').trim():'';
+}
 function createApi(env=process.env,fetcher=fetch,logger=console){
- const base=env.SUPABASE_URL?.trim().replace(/\/$/,''),service=env.SUPABASE_SERVICE_ROLE_KEY?.trim(),key=env.DOCHUB_TOKEN_KEY||service;
+ const base=cleanEnv(env.SUPABASE_URL).replace(/\/$/,''),service=cleanEnv(env.SUPABASE_SERVICE_ROLE_KEY),key=cleanEnv(env.DOCHUB_TOKEN_KEY)||service;
+ const googleClientId=cleanEnv(env.GOOGLE_OAUTH_CLIENT_ID),googleClientSecret=cleanEnv(env.GOOGLE_OAUTH_CLIENT_SECRET);
  const authCache=new Map(),driveTokenCache=new Map();
  async function jsonFetch(url,options){
   const stage=url.includes('/auth/v1/')?'supabase-auth':url.includes('/rest/v1/')?'supabase-database':url.includes('oauth2.googleapis.com')?'google-token':'google-api';
@@ -64,7 +68,7 @@ function createApi(env=process.env,fetcher=fetch,logger=console){
   return authObj;
  }
  async function allowed(c,folder,action){if(!await rpc('dochub_can_folder_action',{p_organization_id:c.org,p_folder_uid:folder,p_action:action,p_user_id:c.user.id},c.bearer))throw fail(403,'Bạn không có quyền thực hiện thao tác trong thư mục này.');}
- async function refresh(refreshToken){return jsonFetch('https://oauth2.googleapis.com/token',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams({grant_type:'refresh_token',refresh_token:refreshToken,client_id:env.GOOGLE_OAUTH_CLIENT_ID,client_secret:env.GOOGLE_OAUTH_CLIENT_SECRET})});}
+ async function refresh(refreshToken){return jsonFetch('https://oauth2.googleapis.com/token',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams({grant_type:'refresh_token',refresh_token:refreshToken,client_id:googleClientId,client_secret:googleClientSecret})});}
  async function ownerToken(c){
   const cached=driveTokenCache.get(c.org);
   if(cached&&cached.expiresAt>Date.now())return cached.token;
@@ -103,8 +107,8 @@ function createApi(env=process.env,fetcher=fetch,logger=console){
   return session;
  }
  async function checkUploadStatus(c,session,id){
-  const token=await ownerToken(c),uploadUrl=unseal(session.encrypted_url,key,id);
-  const response=await fetcher(uploadUrl,{method:'PUT',headers:{Authorization:`Bearer ${token}`,'Content-Range':`bytes */${session.bytes}`},signal:AbortSignal.timeout(15000)}).catch(cause=>{
+  const uploadUrl=unseal(session.encrypted_url,key,id);
+  const response=await fetcher(uploadUrl,{method:'PUT',headers:{'Content-Range':`bytes */${session.bytes}`},signal:AbortSignal.timeout(15000)}).catch(cause=>{
    const timeout=['TimeoutError','AbortError'].includes(cause?.name);throw fail(timeout?504:502,timeout?'Drive phản hồi quá chậm khi kiểm tra phiên tải.':'Không kiểm tra được phiên tải trên Drive.');
   });
   if(response.status===308)return {complete:false,range:response.headers.get('range')};
@@ -180,6 +184,10 @@ function createApi(env=process.env,fetcher=fetch,logger=console){
     const existing=await db(`documents_index?organization_id=eq.${c.org}&doc_uid=eq.${input.id}&select=id`);if(existing.length)throw fail(409,'Tệp đã tồn tại.');
     const mappings=await db(`organization_drive_folders?organization_id=eq.${c.org}&folder_uid=eq.${encodeURIComponent(input.folder)}&select=drive_folder_id`);
     let driveFolderId=mappings[0]?.drive_folder_id;
+    const providedToken=typeof req.headers['x-google-access-token']==='string'?req.headers['x-google-access-token'].trim():'';
+    if(providedToken&&c.user.id===c.organization.owner_id){
+      driveTokenCache.set(c.org,{token:providedToken,expiresAt:Date.now()+15*60*1000});
+    }
     const token=await ownerToken(c);
     if(!driveFolderId){
       const folders=await db(`organization_folders?organization_id=eq.${c.org}&folder_uid=eq.${encodeURIComponent(input.folder)}&select=*`);
@@ -213,10 +221,14 @@ function createApi(env=process.env,fetcher=fetch,logger=console){
     const id=input.upload,s=await uploadSession(c,id);
     const driveFileId=input.driveFileId;
     if(!driveFileId||typeof driveFileId!=='string'||driveFileId.length>200)throw fail(400,'Mã tệp Drive không hợp lệ.');
-    const token=await ownerToken(c);
-    const meta=await jsonFetch(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(driveFileId)}?fields=id,name,size,trashed,parents`,{headers:{Authorization:`Bearer ${token}`}});
-    if(!meta||meta.id!==driveFileId||meta.trashed)throw fail(404,'Không tìm thấy tệp trên Google Drive.');
-    result=await completeUpload(c,s,id,meta);
+    const status=await checkUploadStatus(c,s,id).catch(()=>null);
+    if(status?.complete){result=status;}
+    else{
+      const token=await ownerToken(c);
+      const meta=await jsonFetch(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(driveFileId)}?fields=id,name,size,trashed,parents`,{headers:{Authorization:`Bearer ${token}`}});
+      if(!meta||meta.id!==driveFileId||meta.trashed)throw fail(404,'Không tìm thấy tệp trên Google Drive.');
+      result=await completeUpload(c,s,id,meta);
+    }
    }else if(action==='upload-status'&&req.method==='GET'){
     const id=url.searchParams.get('upload'),s=await uploadSession(c,id);
     result=await checkUploadStatus(c,s,id);
@@ -226,8 +238,8 @@ function createApi(env=process.env,fetcher=fetch,logger=console){
     if(!parts||Number(parts[3])!==Number(s.bytes)||Number(parts[2])>=Number(s.bytes)||Number(parts[2])<Number(parts[1])||Number(parts[1])%262144!==0)throw fail(400,'Khoảng tải không hợp lệ.');
     let payload;if(Buffer.isBuffer(req.body))payload=req.body;else if(typeof req.body==='string')payload=Buffer.from(req.body,'latin1');else{const chunks=[];let size=0;for await(const chunk of req){size+=chunk.length;if(size>10*1024*1024)throw fail(413,'Khối tải vượt giới hạn.');chunks.push(chunk);}payload=Buffer.concat(chunks);}
     if(payload.length>10*1024*1024||payload.length!==Number(parts[2])-Number(parts[1])+1)throw fail(400,'Kích thước khối tải không hợp lệ.');
-    const token=await ownerToken(c),uploadUrl=unseal(s.encrypted_url,key,id);
-    const response=await fetcher(uploadUrl,{method:'PUT',headers:{Authorization:`Bearer ${token}`,'Content-Type':s.mime,'Content-Range':req.headers['content-range']},body:payload,signal:AbortSignal.timeout(60000)});
+    const uploadUrl=unseal(s.encrypted_url,key,id);
+    const response=await fetcher(uploadUrl,{method:'PUT',headers:{'Content-Type':s.mime,'Content-Range':req.headers['content-range']},body:payload,signal:AbortSignal.timeout(60000)});
     if(response.status===308){result={complete:false,range:response.headers.get('range')};}
     else if(response.ok){result=await completeUpload(c,s,id,await response.json());
     }else{

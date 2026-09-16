@@ -49,8 +49,16 @@ const DEMO_FOLDER_UIDS = Object.freeze([
     const {data,error}=await supabase.auth.getSession();
     if(error||!data?.session?.access_token)throw new Error('Vui lòng đăng nhập lại.');
     let response;
+    const googleToken = connectedDriveToken || providerToken || (typeof sessionStorage!=='undefined'?sessionStorage.getItem('dochub_google_token'):null) || null;
     try {
-      response=await fetch(`/api/organization?action=${action}&organization=${encodeURIComponent(organization.id)}`,{...options,headers:{Authorization:`Bearer ${data.session.access_token}`,...options.headers}});
+      response=await fetch(`/api/organization?action=${action}&organization=${encodeURIComponent(organization.id)}`,{
+        ...options,
+        headers:{
+          Authorization:`Bearer ${data.session.access_token}`,
+          ...(googleToken?{'X-Google-Access-Token':googleToken}:{}),
+          ...options.headers
+        }
+      });
     } catch(fetchErr) {
       if(fetchErr?.name==='AbortError')throw fetchErr;
       const netErr=new Error('Mất kết nối mạng tới máy chủ DocHub. Vui lòng kiểm tra đường truyền.');
@@ -59,7 +67,7 @@ const DEMO_FOLDER_UIDS = Object.freeze([
     }
     if(!response.ok){
       const payload=await response.json().catch(()=>({}));
-      const fallback=response.status===413?'Khối dữ liệu quá lớn đối với máy chủ. DocHub sẽ tải lại theo từng phần nhỏ.':response.status===504?'Kho Drive phản hồi quá chậm. Vui lòng giữ trang mở và thử lại.':'Không kết nối được kho doanh nghiệp.';
+      const fallback=response.status===413?'Khối dữ liệu quá lớn đối với máy chủ. DocHub sẽ tải lại theo từng phần nhỏ.':response.status===504?'Kho Drive phản hồi quá chậm. Vui lòng giữ trang mở và thử lại.':(payload.error||'Không kết nối được kho doanh nghiệp.');
       const requestError=new Error(payload.error||fallback);
       requestError.status=response.status;requestError.requestId=payload.requestId||response.headers.get('X-DocHub-Request-Id')||null;
       throw requestError;
@@ -898,7 +906,8 @@ const DEMO_FOLDER_UIDS = Object.freeze([
       let start=options.uploadSession?.id&&Date.now()-(options.uploadSession.createdAt||0)<55*60*1000?options.uploadSession:null;
       if(!start)start=await createSession();
 
-      const chunkSize=start.chunkSize||8*1024*1024;
+      const isMobile = typeof navigator !== 'undefined' && /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent || '');
+      const chunkSize = isMobile ? Math.min(start.chunkSize || 4*1024*1024, 4*1024*1024) : (start.chunkSize || 8*1024*1024);
       let complete=false,driveFileId=null,directFailed=null,proxyOffset=0;
 
       if(options.uploadSession?.id===start.id){
@@ -936,7 +945,7 @@ const DEMO_FOLDER_UIDS = Object.freeze([
                 const onAbort=()=>xhr.abort();
                 xhr.open('PUT',activeDirectUrl);
                 xhr.timeout=120000;
-                xhr.setRequestHeader('Content-Type',blob.type||'application/octet-stream');
+                xhr.setRequestHeader('Content-Type',start.mime||blob.type||'application/octet-stream');
                 xhr.setRequestHeader('Content-Range',`bytes ${offset}-${end-1}/${blob.size}`);
                 xhr.upload.onprogress=event=>{
                   const currentLoaded=Math.min(blob.size,offset+(event.loaded||0));
