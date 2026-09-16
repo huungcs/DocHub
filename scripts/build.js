@@ -199,7 +199,8 @@ const authUiScript = `
 
       const connected = api.connected && api.user;
       const driveConnected = connected && api.isDriveConnected;
-      const hasStoredSession = typeof localStorage !== 'undefined' && Object.keys(localStorage).some(k => k.startsWith('sb-') && k.endsWith('-auth-token'));
+      const hasHashSession = typeof window !== 'undefined' && window.location?.hash?.includes('access_token=');
+      const hasStoredSession = hasHashSession || (typeof localStorage !== 'undefined' && Object.keys(localStorage).some(k => k.startsWith('sb-') && k.endsWith('-auth-token')));
       const busy = ['redirecting', 'connecting_drive', 'signing_out'].includes(api.authStatus) || (api.authStatus === 'checking' && hasStoredSession);
       const needsConfig = api.authStatus === 'configuration_required' || api.googleProviderEnabled === false;
 

@@ -2442,15 +2442,46 @@ window.DocHubMedia={init,open,typeOf,getSession:()=>session};
     };
   }
 
+  const isDemoSession = (typeof sessionStorage !== 'undefined' && sessionStorage.getItem('dochub.demo_mode') === 'true') ||
+    (typeof localStorage !== 'undefined' && localStorage.getItem('dochub.demo_mode') === 'true');
+  let authAccount = null;
+  if (typeof window !== 'undefined' && window.location?.hash?.includes('access_token=')) {
+    try {
+      const m = window.location.hash.match(/access_token=([^&]+)/);
+      if (m) {
+        const parts = m[1].split('.');
+        if (parts.length === 3) {
+          const payload = JSON.parse(decodeURIComponent(escape(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')))));
+          if (payload && (payload.sub || payload.email)) {
+            authAccount = {
+              id: payload.sub,
+              email: payload.email || '',
+              user_metadata: payload.user_metadata || { full_name: payload.name || payload.email || '' }
+            };
+          }
+        }
+      }
+    } catch (_) {}
+  }
+  if (!authAccount && typeof localStorage !== 'undefined') {
+    try {
+      const authKey = Object.keys(localStorage).find(k => k.startsWith('sb-') && k.endsWith('-auth-token'));
+      if (authKey) {
+        const parsed = JSON.parse(localStorage.getItem(authKey) || '{}');
+        authAccount = parsed?.user || parsed?.currentSession?.user || null;
+      }
+    } catch (_) {}
+  }
+
   function stateStorageKey() {
-    let accountId=window.DocHubAPI?.user?.id;
+    let accountId=window.DocHubAPI?.user?.id || authAccount?.id;
     let orgId=window.DocHubAPI?.organization?.id;
     if(!accountId && typeof localStorage!=='undefined'){
       try{
         const authKey=Object.keys(localStorage).find(k=>k.startsWith('sb-')&&k.endsWith('-auth-token'));
         if(authKey){
           const parsed=JSON.parse(localStorage.getItem(authKey)||'{}');
-          accountId=parsed?.user?.id;
+          accountId=parsed?.user?.id || parsed?.currentSession?.user?.id;
         }
       }catch(_){}
     }
@@ -2486,6 +2517,9 @@ window.DocHubMedia={init,open,typeOf,getSession:()=>session};
     return true;
   }
   function loadState() {
+    if (!isDemoSession && !authAccount && !window.DocHubAPI?.user?.id) {
+      return null;
+    }
     try {
       const raw=localStorage.getItem(stateStorageKey());
       if(raw) {
@@ -2496,19 +2530,10 @@ window.DocHubMedia={init,open,typeOf,getSession:()=>session};
     } catch(error) { storageWarning='Trình duyệt không đọc được dữ liệu cục bộ. Bản mẫu vẫn dùng được trong phiên này.'; }
     return null;
   }
-  const isDemoSession = (typeof sessionStorage !== 'undefined' && sessionStorage.getItem('dochub.demo_mode') === 'true') ||
-    (typeof localStorage !== 'undefined' && localStorage.getItem('dochub.demo_mode') === 'true');
-  let authAccount = null;
-  if (typeof localStorage !== 'undefined') {
-    try {
-      const authKey = Object.keys(localStorage).find(k => k.startsWith('sb-') && k.endsWith('-auth-token'));
-      if (authKey) authAccount = JSON.parse(localStorage.getItem(authKey) || '{}')?.user;
-    } catch (_) {}
-  }
   const localState=loadState();
-  const cloudAccount=isDemoSession?null:(window.DocHubAPI?.connected?window.DocHubAPI.user:authAccount);
+  const cloudAccount=isDemoSession?null:(window.DocHubAPI?.connected?window.DocHubAPI.user:(authAccount||{id:'pending',email:'',user_metadata:{full_name:''}}));
   let state=localState&&validState(localState)?localState:cloudAccount?createCloudWorkspace(cloudAccount):createSeed();
-  if (cloudAccount) {
+  if (cloudAccount || !isDemoSession) {
     if (state && Array.isArray(state.folders)) {
       state.folders = state.folders.filter(f => !DEMO_FOLDER_UIDS.includes(f.id));
       if (!state.folders.some(f => f.id === 'all')) {
