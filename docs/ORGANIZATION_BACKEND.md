@@ -14,9 +14,11 @@ offline consent to supply provider_refresh_token. No passwords are shared.
 
 Members read a permission-filtered owner workspace plus the document index.
 Each file request checks active membership and folder permission before using
-the owner's Drive connection. Uploads pass through authenticated 2 MiB chunks;
-each chunk rechecks permission. The browser never receives the owner's token or
-Google upload session URL. Maximum file size remains 250 MiB.
+the owner's Drive connection. Uploads use a short-lived Google resumable session
+URL in the authenticated browser and fall back to authenticated 2 MiB server
+chunks when a direct transfer is blocked. The owner's OAuth token never reaches
+the browser. Every server chunk and status check rechecks permission. Maximum
+file size remains 250 MiB.
 
 Current boundaries requiring follow-up validation:
 - Real owner re-consent and two-account Drive testing are required.
@@ -25,7 +27,7 @@ Current boundaries requiring follow-up validation:
 - Changes made directly in Drive and old externally granted Drive shares are not
   revoked by this backend. Existing external grants must be reconciled separately.
 - Shared data refreshes on page reload. No live multi-user update subscription.
-- Interrupted upload sessions expire after an hour; automatic garbage collection
+- Interrupted upload sessions expire after 24 hours; automatic garbage collection
   and resumable recovery after a page reload are not implemented.
 - Vercel runtime streaming and long video playback require deployment tests.
 

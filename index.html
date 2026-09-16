@@ -3409,7 +3409,7 @@ window.DocHubMedia={init,open,typeOf,getSession:()=>session};
   }
   let uploadPanelDismissed=false,uploadPanelMinimized=false,uploadHideTimer,uploadAutoMinimizeTimer;
   const uploadSpeedTracker={lastTime:0,lastLoaded:0,speed:0};
-  const uploadPhaseLabel=job=>({queued:'Đang chờ',caching:'Đang lưu an toàn',connecting:'Đang kết nối Drive',preparing:'Đang chuẩn bị Drive',uploading:`Đang tải ${job.percent||0}%`,retrying:`Mất mạng · thử lại lần ${job.attempt||1}`,complete:'Đã tải lên Drive',local:'Đã lưu trên thiết bị',error:'Tải lên thất bại',cancelled:'Đã hủy'})[job.status]||'Đang xử lý';
+  const uploadPhaseLabel=job=>({queued:'Đang chờ',caching:'Đang lưu an toàn',connecting:'Đang kết nối Drive',preparing:'Đang chuẩn bị Drive',uploading:`Đang tải ${job.percent||0}%`,retrying:`Mất mạng · thử lại lần ${job.attempt||1}`,fallback:'Đang chuyển đường truyền dự phòng',complete:'Đã tải lên Drive',local:'Đã lưu trên thiết bị',error:'Tải lên thất bại',cancelled:'Đã hủy'})[job.status]||'Đang xử lý';
   function transferMeta(job) {
     if(job.status==='error')return job.error||'Có lỗi xảy ra';
     if(job.status==='local')return job.error||'Chưa đồng bộ Drive · có thể thử lại';
@@ -3538,7 +3538,7 @@ window.DocHubMedia={init,open,typeOf,getSession:()=>session};
     if(!job?.file||job.running)return false;
     job.running=true;job.error='';job.startedAt=Date.now();job.controller=new AbortController();updateUploadJob(job,{phase:'preparing',loaded:0,percent:0});
     try {
-      const assetStorage=await saveAsset(job.docId,job.file,job.parentId,{fileName:job.name+(job.ext?'.'+job.ext:''),ext:job.ext,signal:job.controller.signal,onProgress:progress=>updateUploadJob(job,progress)}),now=new Date().toISOString();
+      const assetStorage=await saveAsset(job.docId,job.file,job.parentId,{fileName:job.name+(job.ext?'.'+job.ext:''),ext:job.ext,signal:job.controller.signal,uploadSession:job.uploadSession,onUploadSession:session=>{job.uploadSession=session;},onProgress:progress=>updateUploadJob(job,progress)}),now=new Date().toISOString();
       if(!job.documentAdded){state.documents.push({id:job.docId,parentId:job.parentId,name:job.name,ext:job.ext,bytes:job.file.size,ownerId:'u1',description:'',updatedAt:now,createdAt:now,starred:false,kind:'file',sample:false,source:'upload',assetStorage,mime:job.file.type||mimeFor(job.ext),deletedAt:null});job.documentAdded=true;commit('Tải lên tài liệu',job.parentId,`${job.fileName} · ${assetStorage==='server'?'Google Drive':'thiết bị này'}`,'upload');}
       else if(assetStorage==='server'){const existing=doc(job.docId);if(existing){existing.assetStorage='server';existing.updatedAt=now;}commit('Đồng bộ lại tài liệu',job.parentId,`${job.fileName} · Google Drive`,'upload');}
       updateUploadJob(job,{phase:assetStorage==='server'?'complete':'local',loaded:job.total,percent:100});

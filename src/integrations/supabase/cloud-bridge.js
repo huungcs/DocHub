@@ -57,7 +57,13 @@ const DEMO_FOLDER_UIDS = Object.freeze([
       netErr.cause=fetchErr;
       throw netErr;
     }
-    if(!response.ok){const payload=await response.json().catch(()=>({}));throw new Error(payload.error||'Không kết nối được kho doanh nghiệp.');}
+    if(!response.ok){
+      const payload=await response.json().catch(()=>({}));
+      const fallback=response.status===413?'Khối dữ liệu quá lớn đối với máy chủ. DocHub sẽ tải lại theo từng phần nhỏ.':response.status===504?'Kho Drive phản hồi quá chậm. Vui lòng giữ trang mở và thử lại.':'Không kết nối được kho doanh nghiệp.';
+      const requestError=new Error(payload.error||fallback);
+      requestError.status=response.status;requestError.requestId=payload.requestId||response.headers.get('X-DocHub-Request-Id')||null;
+      throw requestError;
+    }
     return response;
   }
 
@@ -866,48 +872,70 @@ const DEMO_FOLDER_UIDS = Object.freeze([
    * Lưu trữ tệp tài liệu: Đẩy lên Google Drive của khách hàng và lưu cache cục bộ
    */
   api.putAsset = async (id, blob, parentFolderId = 'all', options = {}) => {
-    const { onProgress, signal } = options;
+    const { onProgress, signal, onUploadSession } = options;
     await api.requirePermission(parentFolderId, 'create');
     if(organizationBackend){
       const ext=options.ext||blob.name?.split('.').pop()||'';
-      let start=null,startErr=null;
-      for(let sAttempt=1;sAttempt<=3;sAttempt++){
-        if(signal?.aborted){const err=new Error('Đã hủy tải tệp lên.');err.name='AbortError';throw err;}
+      const abortError=()=>{const err=new Error('Đã hủy tải tệp lên.');err.name='AbortError';return err;};
+      const rangeOffset=range=>{const match=/bytes=(\d+)-(\d+)/.exec(range||'');return match?Number(match[2])+1:0;};
+      const createSession=async()=>{
+        let created=null,startErr=null;
+        for(let sAttempt=1;sAttempt<=3;sAttempt++){
+          if(signal?.aborted)throw abortError();
+          try{
+            const res=await backend('upload-start',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id,folder:parentFolderId,name:options.fileName||blob.name||id,ext,mime:blob.type,bytes:blob.size}),signal});
+            created={...(await res.json()),createdAt:Date.now()};break;
+          }catch(err){
+            if(err?.name==='AbortError')throw err;
+            startErr=err;
+            if(sAttempt<3)await new Promise(r=>setTimeout(r,600*Math.pow(2,sAttempt-1)));
+          }
+        }
+        if(!created)throw new Error(startErr?.message||'Không thể khởi tạo phiên tải lên Drive.');
+        onUploadSession?.(created);
+        return created;
+      };
+      let start=options.uploadSession?.id&&Date.now()-(options.uploadSession.createdAt||0)<55*60*1000?options.uploadSession:null;
+      if(!start)start=await createSession();
+
+      const chunkSize=start.chunkSize||8*1024*1024;
+      let complete=false,driveFileId=null,directFailed=null,proxyOffset=0;
+
+      if(options.uploadSession?.id===start.id){
         try{
-          const res=await backend('upload-start',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id,folder:parentFolderId,name:options.fileName||blob.name||id,ext,mime:blob.type,bytes:blob.size}),signal});
-          start=await res.json();break;
-        }catch(err){
-          if(err?.name==='AbortError')throw err;
-          startErr=err;
-          if(sAttempt<3)await new Promise(r=>setTimeout(r,600*Math.pow(2,sAttempt-1)));
+          const statusResponse=await backend('upload-status&upload='+encodeURIComponent(start.id),{signal});
+          const status=await statusResponse.json();
+          if(status.complete){onUploadSession?.(null);onProgress?.({phase:'uploading',loaded:blob.size,total:blob.size,percent:100});return {driveStored:true,cached:false};}
+          proxyOffset=rangeOffset(status.range);
+        }catch(statusErr){
+          if(statusErr?.name==='AbortError')throw statusErr;
+          if(statusErr?.status===410){onUploadSession?.(null);start=await createSession();proxyOffset=0;}
+          else console.warn('DocHub: Chưa kiểm tra được phiên tải cũ, sẽ thử tiếp:',statusErr?.message||statusErr);
         }
       }
-      if(!start)throw new Error(startErr?.message||'Không thể khởi tạo phiên tải lên Drive.');
 
-      const directUrl=start.uploadUrl;
-      const chunkSize=start.chunkSize||8*1024*1024;
-      let complete=false,driveFileId=null;
-
-      if(directUrl&&typeof directUrl==='string'&&directUrl.startsWith('https://www.googleapis.com/')){
-        let offset=0;
+      const activeDirectUrl=start.uploadUrl;
+      if(activeDirectUrl&&typeof activeDirectUrl==='string'&&activeDirectUrl.startsWith('https://www.googleapis.com/')){
+        let offset=proxyOffset;
         while(offset<blob.size){
-          if(signal?.aborted){const err=new Error('Đã hủy tải tệp lên.');err.name='AbortError';throw err;}
+          if(signal?.aborted)throw abortError();
           const end=Math.min(blob.size,offset+chunkSize);
           const chunk=blob.slice(offset,end);
           let chunkOk=false,lastErr=null;
 
           for(let attempt=1;attempt<=5;attempt++){
-            if(signal?.aborted){const err=new Error('Đã hủy tải tệp lên.');err.name='AbortError';throw err;}
+            if(signal?.aborted)throw abortError();
             if(attempt>1){
               onProgress?.({phase:'retrying',loaded:offset,total:blob.size,percent:Math.round(offset/blob.size*100),attempt});
               await new Promise(r=>setTimeout(r,Math.min(8000,1000*Math.pow(2,attempt-2))));
             }
             try{
               const chunkResult=await new Promise((resolve,reject)=>{
-                if(signal?.aborted)return reject(new Error('Đã hủy tải tệp lên.'));
+                if(signal?.aborted)return reject(abortError());
                 const xhr=new XMLHttpRequest();
                 const onAbort=()=>xhr.abort();
-                xhr.open('PUT',directUrl);
+                xhr.open('PUT',activeDirectUrl);
+                xhr.timeout=120000;
                 xhr.setRequestHeader('Content-Type',blob.type||'application/octet-stream');
                 xhr.setRequestHeader('Content-Range',`bytes ${offset}-${end-1}/${blob.size}`);
                 xhr.upload.onprogress=event=>{
@@ -926,6 +954,7 @@ const DEMO_FOLDER_UIDS = Object.freeze([
                   }
                 };
                 xhr.onerror=()=>{signal?.removeEventListener('abort',onAbort);reject(new Error('Mất kết nối mạng khi đang truyền tệp lên Drive.'));};
+                xhr.ontimeout=()=>{signal?.removeEventListener('abort',onAbort);reject(new Error('Kết nối tải lên quá chậm. DocHub sẽ chuyển sang đường truyền dự phòng.'));};
                 xhr.onabort=()=>{signal?.removeEventListener('abort',onAbort);const err=new Error('Đã hủy tải tệp lên.');err.name='AbortError';reject(err);};
                 signal?.addEventListener('abort',onAbort,{once:true});
                 xhr.send(chunk);
@@ -944,7 +973,7 @@ const DEMO_FOLDER_UIDS = Object.freeze([
               lastErr=chunkErr;
               console.warn(`DocHub: Tải khối Drive (${offset}-${end}) lần ${attempt}:`,chunkErr?.message||chunkErr);
               try{
-                const statusXhr=await new Promise((res,rej)=>{const x=new XMLHttpRequest();x.open('PUT',directUrl);x.setRequestHeader('Content-Range',`bytes */${blob.size}`);x.onload=()=>res(x);x.onerror=rej;x.send();});
+                const statusXhr=await new Promise((res,rej)=>{const x=new XMLHttpRequest();x.open('PUT',activeDirectUrl);x.timeout=20000;x.setRequestHeader('Content-Range',`bytes */${blob.size}`);x.onload=()=>res(x);x.onerror=rej;x.ontimeout=rej;x.send();});
                 if(statusXhr.status===308){
                   const r=statusXhr.getResponseHeader('Range'),m=/bytes=(\d+)-(\d+)/.exec(r||'');
                   if(m&&Number(m[2])+1>offset){offset=Number(m[2])+1;chunkOk=true;break;}
@@ -955,19 +984,34 @@ const DEMO_FOLDER_UIDS = Object.freeze([
             }
           }
           if(!chunkOk){
-            const msg=lastErr?.message&&!/Failed to fetch/i.test(lastErr.message)?lastErr.message:'Mất kết nối mạng khi đang tải lên. Vui lòng kiểm tra đường truyền và thử lại.';
-            throw new Error(msg);
+            directFailed=lastErr||new Error('Đường tải trực tiếp tới Drive bị gián đoạn.');
+            break;
           }
         }
 
         if(complete&&driveFileId){
-          await backend('upload-finish',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({upload:start.id,driveFileId}),signal});
-          onProgress?.({phase:'uploading',loaded:blob.size,total:blob.size,percent:100});
-          return {driveStored:true,cached:false};
+          try{
+            await backend('upload-finish',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({upload:start.id,driveFileId}),signal});
+            onUploadSession?.(null);onProgress?.({phase:'uploading',loaded:blob.size,total:blob.size,percent:100});
+            return {driveStored:true,cached:false};
+          }catch(finishErr){
+            if(finishErr?.name==='AbortError')throw finishErr;
+            directFailed=finishErr;
+          }
         }
       }
 
-      let proxyOffset=0;
+      if(directFailed)onProgress?.({phase:'fallback',loaded:proxyOffset,total:blob.size,percent:Math.round((proxyOffset/blob.size)*100)});
+      try{
+        const statusResponse=await backend('upload-status&upload='+encodeURIComponent(start.id),{signal});
+        const status=await statusResponse.json();
+        if(status.complete){onUploadSession?.(null);onProgress?.({phase:'uploading',loaded:blob.size,total:blob.size,percent:100});return {driveStored:true,cached:false};}
+        proxyOffset=rangeOffset(status.range);
+      }catch(statusErr){
+        if(statusErr?.name==='AbortError')throw statusErr;
+        if(statusErr?.status===410){onUploadSession?.(null);start=await createSession();proxyOffset=0;}
+        else if(directFailed)console.warn('DocHub: Đường tải trực tiếp lỗi, chuyển sang máy chủ trung gian:',directFailed?.message||directFailed);
+      }
       const proxyChunkSize=2*1024*1024;
       while(proxyOffset<blob.size){
         if(signal?.aborted){const err=new Error('Đã hủy tải tệp lên.');err.name='AbortError';throw err;}
@@ -1015,6 +1059,7 @@ const DEMO_FOLDER_UIDS = Object.freeze([
         }
       }
       if(!complete)throw new Error('Kho doanh nghiệp chưa xác nhận tải xong.');
+      onUploadSession?.(null);
       return {driveStored:true,cached:false};
     }
     if (signal?.aborted) {

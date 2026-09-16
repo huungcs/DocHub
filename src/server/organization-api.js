@@ -207,7 +207,7 @@ function createApi(env=process.env,fetcher=fetch,logger=console){
     const response=await fetcher('https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable&fields=id,size',{method:'POST',headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json','X-Upload-Content-Length':String(input.bytes),'X-Upload-Content-Type':mime,...(origin?{Origin:origin}:{})},body:JSON.stringify({name:input.name,mimeType:mime,parents:[driveFolderId]}),signal:AbortSignal.timeout(30000)});
     if(!response.ok)throw fail(502,'Không tạo được phiên tải vào kho Drive.');
     const location=response.headers.get('location');if(!location||new URL(location).hostname!=='www.googleapis.com')throw fail(502,'Phiên tải Drive không hợp lệ.');
-    const id=crypto.randomUUID();await db('organization_uploads',{method:'POST',body:JSON.stringify({id,organization_id:c.org,user_id:c.user.id,doc_uid:input.id,folder_uid:input.folder,name:input.name,ext:documentExtension(input.ext,mime,input.name),mime,bytes:input.bytes,encrypted_url:seal(location,key,id)})});result={id,uploadUrl:location,chunkSize:8*1024*1024};
+    const id=crypto.randomUUID();await db('organization_uploads',{method:'POST',body:JSON.stringify({id,organization_id:c.org,user_id:c.user.id,doc_uid:input.id,folder_uid:input.folder,name:input.name,ext:documentExtension(input.ext,mime,input.name),mime,bytes:input.bytes,encrypted_url:seal(location,key,id),expires_at:new Date(Date.now()+24*60*60*1000).toISOString()})});result={id,uploadUrl:location,chunkSize:8*1024*1024};
    }else if(action==='upload-finish'&&req.method==='POST'){
     const input=await body(req);
     const id=input.upload,s=await uploadSession(c,id);

@@ -16,9 +16,18 @@ test('Drive uploads use resumable sessions and byte-aligned chunks', () => {
 });
 
 test('Upload progress flows from Drive through the cloud bridge', () => {
-  assert.match(bridge, /const \{ onProgress, signal \} = options/);
+  assert.match(bridge, /const \{ onProgress, signal, onUploadSession \} = options/);
   assert.match(bridge, /\{ onProgress, signal \}/);
   assert.match(bridge, /phase: 'local'/);
+});
+
+test('Large organization uploads resume and fall back when direct Drive transfer is blocked', () => {
+  assert.match(bridge, /upload-status&upload=/);
+  assert.match(bridge, /phase:'fallback'/);
+  assert.match(bridge, /const proxyChunkSize=2\*1024\*1024/);
+  assert.match(bridge, /xhr\.timeout=120000/);
+  assert.match(bridge, /onUploadSession\?\.\(created\)/);
+  assert.match(app, /uploadSession:job\.uploadSession/);
 });
 
 test('Upload center exposes progress, cancellation and retry controls', () => {
