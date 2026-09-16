@@ -59,3 +59,12 @@ test('Workspace resolves its initial folder without calling helpers before initi
   assert.match(template, /const preferredFolder = state\.folders\.find/);
   assert.doesNotMatch(template, /const defaultFolder = \(cloudAccount \|\| !active\(folder/);
 });
+
+test('Exiting demo mode clears both sessionStorage and localStorage flags and restores login gateway', () => {
+  assert.match(buildScript, /case 'exit-demo':/);
+  assert.match(buildScript, /sessionStorage\.removeItem\('dochub\.demo_mode'\)/);
+  assert.match(buildScript, /localStorage\.removeItem\('dochub\.demo_mode'\)/);
+  assert.match(buildScript, /document\.documentElement\.classList\.remove\('demo-mode-active'\)/);
+  assert.match(buildScript, /document\.body\.classList\.add\('auth-locked'\)/);
+  assert.match(buildScript, /location\.reload\(\)/);
+});

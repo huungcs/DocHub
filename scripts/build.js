@@ -20,7 +20,8 @@ const preconnectTags = `
   <link rel="dns-prefetch" href="https://ethrdeaeemkjgolmkrmq.supabase.co">
   <script>
     try {
-      if (localStorage.getItem('dochub.demo_mode') === 'true') {
+      if ((typeof localStorage !== 'undefined' && localStorage.getItem('dochub.demo_mode') === 'true') ||
+          (typeof sessionStorage !== 'undefined' && sessionStorage.getItem('dochub.demo_mode') === 'true')) {
         document.documentElement.classList.add('demo-mode-active');
       }
     } catch(_) {}
@@ -67,7 +68,9 @@ const newAccountCase = `case 'account': {
           const isConnected = api?.connected;
           const usr = api?.user;
           const usrName = usr?.user_metadata?.full_name || usr?.email || user('u1').name;
-          const isDemo = typeof sessionStorage !== 'undefined' && sessionStorage.getItem('dochub.demo_mode') === 'true';
+          const isDemo = (typeof sessionStorage !== 'undefined' && sessionStorage.getItem('dochub.demo_mode') === 'true') ||
+            (typeof localStorage !== 'undefined' && localStorage.getItem('dochub.demo_mode') === 'true') ||
+            (typeof document !== 'undefined' && document.documentElement.classList.contains('demo-mode-active'));
           const usrRole = isConnected ? 'Tài khoản đám mây (Cloud + Google Drive)' : isDemo ? 'Bản trải nghiệm Demo (Dữ liệu mẫu)' : 'Tài khoản mẫu cục bộ';
           
           let menuHtml = \`<p class="menu-label">\${e(usrName)} · \${e(usrRole)}</p>\`;
@@ -93,9 +96,28 @@ const newAccountCase = `case 'account': {
           break;
         }
         case 'exit-demo':
-          if (typeof sessionStorage !== 'undefined') {
-            sessionStorage.removeItem('dochub.demo_mode');
-          }
+          try {
+            if (typeof sessionStorage !== 'undefined') {
+              sessionStorage.removeItem('dochub.demo_mode');
+            }
+            if (typeof localStorage !== 'undefined') {
+              localStorage.removeItem('dochub.demo_mode');
+            }
+            if (typeof document !== 'undefined') {
+              document.documentElement.classList.remove('demo-mode-active');
+              document.body.classList.add('auth-locked');
+              const authScr = document.getElementById('authScreen');
+              if (authScr) authScr.hidden = false;
+              const appEl = document.getElementById('app');
+              if (appEl) {
+                appEl.inert = true;
+                appEl.setAttribute('aria-hidden', 'true');
+              }
+            }
+            if (window.location.hash) {
+              history.replaceState(null, '', window.location.pathname);
+            }
+          } catch (_) {}
           location.reload();
           break;
         case 'google-auth':
@@ -209,6 +231,13 @@ const authUiScript = `
 
       if (statusBadge) {
         statusBadge.style.display = '';
+        if (isDemo && !connected) {
+          statusBadge.title = 'Bản trải nghiệm Demo — Bấm vào đây hoặc ảnh đại diện để mở menu thoát';
+          statusBadge.style.cursor = 'pointer';
+        } else {
+          statusBadge.title = driveConnected ? 'Đã kết nối Cloud' : connected ? 'Đã kết nối máy chủ' : '';
+          statusBadge.style.cursor = '';
+        }
       }
       if (statusText) {
         statusText.textContent = driveConnected ? 'Đã kết nối Cloud' : connected ? 'Đã kết nối máy chủ' : 'Bản trải nghiệm';
@@ -284,6 +313,18 @@ const authUiScript = `
         }
         document.documentElement.classList.add('demo-mode-active');
         location.reload();
+      });
+    }
+
+    if (statusBadge) {
+      statusBadge.addEventListener('click', () => {
+        const isCurrentDemo = (typeof sessionStorage !== 'undefined' && sessionStorage.getItem('dochub.demo_mode') === 'true') ||
+          (typeof localStorage !== 'undefined' && localStorage.getItem('dochub.demo_mode') === 'true') ||
+          (typeof document !== 'undefined' && document.documentElement.classList.contains('demo-mode-active'));
+        if (isCurrentDemo && (!api || !api.connected)) {
+          const profileBtn = document.querySelector('.profile-button');
+          if (profileBtn) profileBtn.click();
+        }
       });
     }
 
