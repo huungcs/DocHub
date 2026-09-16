@@ -28,13 +28,14 @@ const preconnectTags = `
   </script>
 `;
 
+const buildVersion = Date.now();
 const bridgeScripts = `
   <!-- DocHub Cloud Integrations (Loaded after inline CSS to prevent render-blocking) -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="./assets/client-config.js"></script>
-  <script src="./assets/search-engine.js"></script>
-  <script src="./assets/google-drive-client.js"></script>
-  <script src="./assets/cloud-bridge.js"></script>
+  <script src="./assets/client-config.js?v=${buildVersion}"></script>
+  <script src="./assets/search-engine.js?v=${buildVersion}"></script>
+  <script src="./assets/google-drive-client.js?v=${buildVersion}"></script>
+  <script src="./assets/cloud-bridge.js?v=${buildVersion}"></script>
 `;
 
 html = html.replace('<head>', '<head>' + preconnectTags);

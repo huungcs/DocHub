@@ -49,7 +49,7 @@ const DEMO_FOLDER_UIDS = Object.freeze([
     const {data,error}=await supabase.auth.getSession();
     if(error||!data?.session?.access_token)throw new Error('Vui lòng đăng nhập lại.');
     let response;
-    const googleToken = connectedDriveToken || providerToken || (typeof sessionStorage!=='undefined'?sessionStorage.getItem('dochub_google_token'):null) || null;
+    const googleToken = connectedDriveToken || providerToken || (typeof sessionStorage!=='undefined'?sessionStorage.getItem('dochub_google_token'):null) || (typeof localStorage!=='undefined'?localStorage.getItem('dochub_google_token'):null) || null;
     try {
       response=await fetch(`/api/organization?action=${action}&organization=${encodeURIComponent(organization.id)}`,{
         ...options,
@@ -67,7 +67,7 @@ const DEMO_FOLDER_UIDS = Object.freeze([
     }
     if(!response.ok){
       const payload=await response.json().catch(()=>({}));
-      const fallback=response.status===413?'Khối dữ liệu quá lớn đối với máy chủ. DocHub sẽ tải lại theo từng phần nhỏ.':response.status===504?'Kho Drive phản hồi quá chậm. Vui lòng giữ trang mở và thử lại.':(payload.error||'Không kết nối được kho doanh nghiệp.');
+      const fallback=response.status===413?'Khối dữ liệu quá lớn đối với máy chủ. DocHub sẽ tải lại theo từng phần nhỏ.':response.status===504?'Kho Drive phản hồi quá chậm. Vui lòng giữ trang mở và thử lại.':response.status===401?'Phiên đăng nhập hoặc quyền kết nối Drive đã hết hạn. Vui lòng đăng nhập lại.':(payload.error||'Không kết nối được kho doanh nghiệp.');
       const requestError=new Error(payload.error||fallback);
       requestError.status=response.status;requestError.requestId=payload.requestId||response.headers.get('X-DocHub-Request-Id')||null;
       throw requestError;
@@ -291,6 +291,8 @@ const DEMO_FOLDER_UIDS = Object.freeze([
       try {
         sessionStorage.removeItem('dochub_google_token');
         sessionStorage.removeItem('dochub_google_token_time');
+        localStorage.removeItem('dochub_google_token');
+        localStorage.removeItem('dochub_google_token_time');
       } catch(_) {}
       authError = 'Phiên kết nối Google Drive đã hết hạn. Mở menu tài khoản → Kết nối lại Google Drive.';
       emitAuth('DRIVE_TOKEN_EXPIRED');
@@ -385,13 +387,15 @@ const DEMO_FOLDER_UIDS = Object.freeze([
 
     let storedToken = null;
     try {
-      const raw = sessionStorage.getItem('dochub_google_token');
-      const time = Number(sessionStorage.getItem('dochub_google_token_time') || 0);
-      if (raw && time && (Date.now() - time < 50 * 60 * 1000)) {
+      const raw = sessionStorage.getItem('dochub_google_token') || localStorage.getItem('dochub_google_token');
+      const time = Number(sessionStorage.getItem('dochub_google_token_time') || localStorage.getItem('dochub_google_token_time') || 0);
+      if (raw && time && (Date.now() - time < 55 * 60 * 1000)) {
         storedToken = raw;
       } else if (raw) {
         sessionStorage.removeItem('dochub_google_token');
         sessionStorage.removeItem('dochub_google_token_time');
+        localStorage.removeItem('dochub_google_token');
+        localStorage.removeItem('dochub_google_token_time');
       }
     } catch(_) {}
     providerToken = session.provider_token || storedToken || null;
@@ -399,6 +403,8 @@ const DEMO_FOLDER_UIDS = Object.freeze([
       try {
         sessionStorage.setItem('dochub_google_token', session.provider_token);
         sessionStorage.setItem('dochub_google_token_time', String(Date.now()));
+        localStorage.setItem('dochub_google_token', session.provider_token);
+        localStorage.setItem('dochub_google_token_time', String(Date.now()));
       } catch(_) {}
     }
     authStatus = providerToken ? 'connecting_drive' : 'authenticated';
@@ -886,12 +892,13 @@ const DEMO_FOLDER_UIDS = Object.freeze([
       const ext=options.ext||blob.name?.split('.').pop()||'';
       const abortError=()=>{const err=new Error('Đã hủy tải tệp lên.');err.name='AbortError';return err;};
       const rangeOffset=range=>{const match=/bytes=(\d+)-(\d+)/.exec(range||'');return match?Number(match[2])+1:0;};
+      const clientOrigin = typeof window !== 'undefined' && window.location ? window.location.origin : null;
       const createSession=async()=>{
         let created=null,startErr=null;
         for(let sAttempt=1;sAttempt<=3;sAttempt++){
           if(signal?.aborted)throw abortError();
           try{
-            const res=await backend('upload-start',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id,folder:parentFolderId,name:options.fileName||blob.name||id,ext,mime:blob.type,bytes:blob.size}),signal});
+            const res=await backend('upload-start',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id,folder:parentFolderId,name:options.fileName||blob.name||id,ext,mime:blob.type,bytes:blob.size,origin:clientOrigin}),signal});
             created={...(await res.json()),createdAt:Date.now()};break;
           }catch(err){
             if(err?.name==='AbortError')throw err;
@@ -907,7 +914,7 @@ const DEMO_FOLDER_UIDS = Object.freeze([
       if(!start)start=await createSession();
 
       const isMobile = typeof navigator !== 'undefined' && /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent || '');
-      const chunkSize = isMobile ? Math.min(start.chunkSize || 4*1024*1024, 4*1024*1024) : (start.chunkSize || 8*1024*1024);
+      const chunkSize = isMobile ? (2 * 1024 * 1024) : Math.min(start.chunkSize || 4 * 1024 * 1024, 4 * 1024 * 1024);
       let complete=false,driveFileId=null,directFailed=null,proxyOffset=0;
 
       if(options.uploadSession?.id===start.id){
@@ -974,7 +981,7 @@ const DEMO_FOLDER_UIDS = Object.freeze([
               }
               if(chunkResult.range){
                 const m=/bytes=(\d+)-(\d+)/.exec(chunkResult.range);
-                if(m&&Number(m[2])+1>offset){offset=Number(m[2])+1;chunkOk=true;break;}
+                if(m&&Number(m[2])+1>=offset){offset=Number(m[2])+1;chunkOk=true;break;}
               }
               offset=end;chunkOk=true;break;
             }catch(chunkErr){
@@ -985,7 +992,7 @@ const DEMO_FOLDER_UIDS = Object.freeze([
                 const statusXhr=await new Promise((res,rej)=>{const x=new XMLHttpRequest();x.open('PUT',activeDirectUrl);x.timeout=20000;x.setRequestHeader('Content-Range',`bytes */${blob.size}`);x.onload=()=>res(x);x.onerror=rej;x.ontimeout=rej;x.send();});
                 if(statusXhr.status===308){
                   const r=statusXhr.getResponseHeader('Range'),m=/bytes=(\d+)-(\d+)/.exec(r||'');
-                  if(m&&Number(m[2])+1>offset){offset=Number(m[2])+1;chunkOk=true;break;}
+                  if(m&&Number(m[2])+1>=offset){offset=Number(m[2])+1;chunkOk=true;break;}
                 }else if(statusXhr.status===200||statusXhr.status===201){
                   const d=JSON.parse(statusXhr.responseText);complete=true;driveFileId=d.id;offset=blob.size;chunkOk=true;break;
                 }
@@ -999,14 +1006,20 @@ const DEMO_FOLDER_UIDS = Object.freeze([
         }
 
         if(complete&&driveFileId){
-          try{
-            await backend('upload-finish',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({upload:start.id,driveFileId}),signal});
-            onUploadSession?.(null);onProgress?.({phase:'uploading',loaded:blob.size,total:blob.size,percent:100});
-            return {driveStored:true,cached:false};
-          }catch(finishErr){
-            if(finishErr?.name==='AbortError')throw finishErr;
-            directFailed=finishErr;
+          let finishError=null;
+          for(let fAttempt=1;fAttempt<=3;fAttempt++){
+            if(signal?.aborted)throw abortError();
+            try{
+              await backend('upload-finish',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({upload:start.id,driveFileId}),signal});
+              onUploadSession?.(null);onProgress?.({phase:'uploading',loaded:blob.size,total:blob.size,percent:100});
+              return {driveStored:true,cached:false};
+            }catch(finishErr){
+              if(finishErr?.name==='AbortError')throw finishErr;
+              finishError=finishErr;
+              if(fAttempt<3)await new Promise(r=>setTimeout(r,1000*fAttempt));
+            }
           }
+          throw finishError||new Error('Tệp đã tải lên Drive nhưng chưa ghi nhận được vào DocHub.');
         }
       }
 
@@ -1046,7 +1059,7 @@ const DEMO_FOLDER_UIDS = Object.freeze([
             }
             if(result.range){
               const m=/bytes=(\d+)-(\d+)/.exec(result.range);
-              if(m&&Number(m[2])+1>proxyOffset){
+              if(m&&Number(m[2])+1>=proxyOffset){
                 proxyOffset=Number(m[2])+1;chunkOk=true;
                 onProgress?.({phase:'uploading',loaded:proxyOffset,total:blob.size,percent:Math.round((proxyOffset/blob.size)*100)});
                 break;
@@ -1337,6 +1350,9 @@ const DEMO_FOLDER_UIDS = Object.freeze([
     emitAuth('SIGN_OUT_STARTED');
     await api.flush();
     sessionStorage.removeItem('dochub_google_token');
+    sessionStorage.removeItem('dochub_google_token_time');
+    localStorage.removeItem('dochub_google_token');
+    localStorage.removeItem('dochub_google_token_time');
     const { error } = await supabase.auth.signOut({ scope: 'local' });
     if (error) {
       authStatus = currentUser ? 'authenticated' : 'signed_out';
