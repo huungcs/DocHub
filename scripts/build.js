@@ -28,22 +28,22 @@ const preconnectTags = `
 `;
 
 const bridgeScripts = `
-  <!-- Supabase JS & DocHub Cloud Integrations (Loaded after inline CSS to prevent render-blocking) -->
+  <!-- DocHub Cloud Integrations (Loaded after inline CSS to prevent render-blocking) -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="./assets/client-config.js"></script>
   <script src="./assets/search-engine.js"></script>
   <script src="./assets/google-drive-client.js"></script>
-  <script src="./assets/supabase-cloud-bridge.js"></script>
+  <script src="./assets/cloud-bridge.js"></script>
 `;
 
 html = html.replace('<head>', '<head>' + preconnectTags);
 html = html.replace('</head>', bridgeScripts + '</head>');
 
-// 2. Replace the old local mock because the Supabase bridge provides window.DocHubAPI.
+// 2. Replace the old local mock because the cloud bridge provides window.DocHubAPI.
 const oldApiRegex = /<script>\s*\/\*\s*Optional same-origin local backend[\s\S]*?window\.DocHubAPI=api;\s*\}\)\(\);\s*<\/script>/;
 
 if (oldApiRegex.test(html)) {
-  html = html.replace(oldApiRegex, `<!-- DocHubAPI is provided by assets/supabase-cloud-bridge.js -->`);
+  html = html.replace(oldApiRegex, `<!-- DocHubAPI is provided by cloud bridge -->`);
   console.log('Successfully replaced old local mock API with DocHub Cloud Bridge.');
 } else {
   console.warn('Old API regex did not match; checking fallback.');
@@ -68,7 +68,7 @@ const newAccountCase = `case 'account': {
           const usr = api?.user;
           const usrName = usr?.user_metadata?.full_name || usr?.email || user('u1').name;
           const isDemo = typeof sessionStorage !== 'undefined' && sessionStorage.getItem('dochub.demo_mode') === 'true';
-          const usrRole = isConnected ? 'Tài khoản đám mây (Supabase + Google Drive)' : isDemo ? 'Bản trải nghiệm Demo (Dữ liệu mẫu)' : 'Tài khoản mẫu cục bộ';
+          const usrRole = isConnected ? 'Tài khoản đám mây (Cloud + Google Drive)' : isDemo ? 'Bản trải nghiệm Demo (Dữ liệu mẫu)' : 'Tài khoản mẫu cục bộ';
           
           let menuHtml = \`<p class="menu-label">\${e(usrName)} · \${e(usrRole)}</p>\`;
           if(isConnected) menuHtml += menuItem('switch-workspace','Chuyển không gian','building');
@@ -203,7 +203,7 @@ const authUiScript = `
       if (loginStatus) {
         loginStatus.classList.toggle('is-error', needsConfig || api.authStatus === 'error' || api.authStatus === 'unavailable');
         loginStatus.textContent = busy ? 'Vui lòng chờ trong giây lát.' :
-          needsConfig ? 'Quản trị viên cần bật Google Provider trong Supabase.' :
+          needsConfig ? 'Quản trị viên cần hoàn tất cấu hình xác thực Google trên máy chủ.' :
           api.authError || 'Dùng tài khoản Google đã được tổ chức của bạn cho phép.';
       }
 
@@ -211,7 +211,7 @@ const authUiScript = `
         statusBadge.style.display = '';
       }
       if (statusText) {
-        statusText.textContent = driveConnected ? 'Đã kết nối Cloud' : connected ? 'Đã đăng nhập Supabase' : 'Bản trải nghiệm';
+        statusText.textContent = driveConnected ? 'Đã kết nối Cloud' : connected ? 'Đã kết nối máy chủ' : 'Bản trải nghiệm';
       }
       if (dot) {
         dot.style.background = driveConnected || connected ? '#227358' : 'var(--amber)';
@@ -306,6 +306,7 @@ const browserAssets = [
   ['src/app/jszip.min.js', 'jszip.min.js'],
   ['src/config/client-config.js', 'client-config.js'],
   ['src/integrations/google-drive/client.js', 'google-drive-client.js'],
+  ['src/integrations/supabase/cloud-bridge.js', 'cloud-bridge.js'],
   ['src/integrations/supabase/cloud-bridge.js', 'supabase-cloud-bridge.js']
 ];
 

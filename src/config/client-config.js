@@ -1,5 +1,5 @@
 // DocHub Configuration
-// Kết nối Supabase & Google Drive
+// Cấu hình máy chủ đám mây & Google Drive
 window.DOCHUB_CONFIG = {
   SUPABASE_URL: 'https://ethrdeaeemkjgolmkrmq.supabase.co',
   SUPABASE_ANON_KEY: 'sb_publishable_bnVc3KISKdPHUdKIHoKDzQ_XX0qf16K',

@@ -16,7 +16,6 @@
   let supabase = null;
   if (window.supabase?.createClient) {
     supabase = window.supabase.createClient(config.SUPABASE_URL, config.SUPABASE_ANON_KEY);
-    window.DocHubSupabase = supabase;
   }
 
   let currentUser = null;
@@ -29,7 +28,7 @@
   let pendingState = null;
   let saveQueue = Promise.resolve();
   let authStatus = supabase ? 'checking' : 'unavailable';
-  let authError = supabase ? null : 'Không tải được thư viện Supabase.';
+  let authError = supabase ? null : 'Không tải được thư viện xác thực đám mây.';
   let authReadyResolve;
   let authReadySettled = false;
   let connectedDriveToken = null;
@@ -338,7 +337,7 @@
   }
   async function applySessionOnce(session, event = 'INITIAL_SESSION') {
     authError = googleProviderEnabled === false ?
-      'Google Provider chưa được bật trong Supabase Authentication.' : null;
+      'Google Provider chưa được bật trong hệ thống xác thực máy chủ.' : null;
     currentUser = session?.user || null;
 
     if (!currentUser) {
@@ -433,7 +432,7 @@
   api.ready = new Promise(resolve => { authReadyResolve = resolve; });
   (async () => {
     if (!supabase) {
-      console.warn('DocHub: Chưa nạp thư viện Supabase JS.');
+      console.warn('DocHub: Chưa nạp thư viện kết nối máy chủ đám mây.');
       emitAuth('CLIENT_UNAVAILABLE');
       settleReady(false);
       return;
@@ -443,7 +442,7 @@
       checkGoogleProvider().then(enabled => {
         if (!currentUser && enabled === false) {
           authStatus = 'configuration_required';
-          authError = 'Google Provider chưa được bật trong Supabase Authentication.';
+          authError = 'Google Provider chưa được bật trong hệ thống xác thực máy chủ.';
           emitAuth('CONFIGURATION_REQUIRED');
         }
       });
@@ -679,7 +678,7 @@
         const cached=await cacheGet('meta', userCacheKey('workspace_state'));
         if(cached?.state){workspaceLoadStatus='loaded';revision=cached.revision||1;return cached.state;}
         workspaceLoadStatus = 'error';
-        console.warn('Lỗi đọc dữ liệu từ Supabase:', error);
+        console.warn('Lỗi đọc dữ liệu từ máy chủ đám mây:', error);
         return null;
       }
 
@@ -692,7 +691,7 @@
         workspaceLoadStatus = 'loaded';
         revision = data.revision || 1;
         await cacheSet('meta', userCacheKey('workspace_state'), { state: data.state, revision });
-        console.log(`DocHub: Đã tải không gian làm việc từ Supabase (Revision ${revision})`);
+        console.log(`DocHub: Đã tải không gian làm việc từ máy chủ đám mây (Revision ${revision})`);
         return data.state;
       }
 
@@ -1050,11 +1049,11 @@
    * Đăng nhập Google và cấp quyền Google Drive
    */
   api.loginWithGoogle = async ({ reconnectDrive = false } = {}) => {
-    if (!supabase) throw new Error('Supabase chưa sẵn sàng. Hãy kiểm tra kết nối mạng và cấu hình.');
+    if (!supabase) throw new Error('Máy chủ đám mây chưa sẵn sàng. Hãy kiểm tra kết nối mạng và cấu hình.');
     if (googleProviderEnabled === null) await checkGoogleProvider();
     if (googleProviderEnabled === false) {
       authStatus = 'configuration_required';
-      authError = 'Hãy bật Google Provider và nhập OAuth Client ID/Secret trong Supabase Authentication trước.';
+      authError = 'Hãy bật Google Provider và cấu hình OAuth Client ID/Secret trên hệ thống máy chủ trước.';
       emitAuth('CONFIGURATION_REQUIRED');
       throw new Error(authError);
     }
