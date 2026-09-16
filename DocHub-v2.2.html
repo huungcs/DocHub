@@ -2859,7 +2859,7 @@ window.DocHubMedia={init,open,typeOf,getSession:()=>session};
         <div class="source-list">${check.sources.length?check.sources.map(rule=>`<p>${icon('link','tiny')} ${e(principalName(rule))} → <strong>${e(ROLES[rule.role].label)}</strong> · ${rule.inherited?`Kế thừa từ ${e(folder(rule.sourceId)?.name)}`:'Cấp trực tiếp tại thư mục này'}</p>`).join(''):`<p>${e(inspectUserMessage(user(ui.inspectUser)))}</p>`}</div>
         <details class="matrix-details"><summary>Chi tiết các vai trò và quyền tương ứng</summary><div class="matrix-scroll"><table class="role-matrix"><thead><tr><th>Vai trò</th>${Object.values(ACTIONS).map(label=>`<th>${e(label)}</th>`).join('')}</tr></thead><tbody>${Object.values(ROLES).map(role=>`<tr><td>${e(role.label)}</td>${Object.keys(ACTIONS).map(key=>`<td class="${role.permissions.includes(key)?'yes':''}">${role.permissions.includes(key)?'✓':'—'}</td>`).join('')}</tr>`).join('')}</tbody></table></div></details>
       </section>
-      <details class="matrix-details"><summary>Điều chỉnh quyền thư mục (nâng cao)</summary><p class="principal-caption">Dùng khi cần cấp quyền cho nhóm, điều chỉnh hoặc thu hồi quyền tại thư mục này. Quyền từ nhiều nguồn được cộng gộp.</p>
+      <details class="matrix-details" open><summary>Điều chỉnh quyền thư mục (nâng cao)</summary><p class="principal-caption">Dùng khi cần cấp quyền cho nhóm, điều chỉnh hoặc thu hồi quyền tại thư mục này. Quyền từ nhiều nguồn được cộng gộp.</p>
       <div class="inheritance-row ${current.inherit?'':'off'}"><span class="inheritance-icon">${icon(current.inherit?'link':'lock')}</span><div class="inheritance-copy"><strong>${hasParent?'Kế thừa quyền từ thư mục cha':'Quyền tại thư mục gốc'}</strong><p>${!hasParent?'Thư mục gốc không có quyền kế thừa.':current.inherit?`Đang kế thừa từ <button class="text-button" data-action="permission-parent" data-id="${e(parent.id)}">${e(parent.name)}</button>. Quyền riêng được cộng thêm.`:'Quyền riêng đang được áp dụng. Không nhận quyền từ thư mục cha.'}</p></div><button class="switch" role="switch" aria-checked="${!!current.inherit}" aria-label="Kế thừa quyền từ thư mục cha" data-action="toggle-inheritance" ${!hasParent?'disabled':''}></button></div>
       ${window.DocHubAPI?.connected&&['owner','admin'].includes(window.DocHubAPI.organization?.role)?`<section class="settings-card"><h3>Đồng bộ quyền Google Drive</h3><p class="principal-caption">Chỉ chia sẻ theo email đã cấp quyền. Writer cho phép sửa trực tiếp ngoài DocHub. Quyền Drive cấp thủ công không được tự thu hồi.</p><button class="btn sm" data-action="enable-drive-sharing">${state.preferences.driveSharingEnabled?'Thử đồng bộ lại quyền Drive':'Bật đồng bộ quyền Drive'}</button></section>`:''}
       <section class="settings-card">
@@ -3128,11 +3128,14 @@ window.DocHubMedia={init,open,typeOf,getSession:()=>session};
     advanced.innerHTML='<summary>Nâng cao: phòng ban, nhóm và trạng thái</summary>';
     department.before(advanced);
     advancedFields.forEach(field=>advanced.append(field));
-    const scope=active(folder(ui.permissionFolder))?ui.permissionFolder:'all';
+    const existingRule = id ? state.acl.find(r => r.principalType === 'user' && r.principalId === id) : null;
+    const scope = (existingRule && active(folder(existingRule.resourceId)))
+      ? existingRule.resourceId
+      : (active(folder(ui.permissionFolder)) ? ui.permissionFolder : 'all');
     advanced.insertAdjacentHTML('beforebegin',`<fieldset class="field" style="border:0;padding:0"><legend class="field-label">Chọn vai trò</legend><div class="checkbox-list">
-      ${id?'<label class="checkbox-option"><input type="radio" name="quickRole" value="keep" checked><span><strong>Giữ nguyên quyền hiện tại</strong></span></label>':''}
+      ${id?`<label class="checkbox-option"><input type="radio" name="quickRole" value="keep" checked><span><strong>Giữ nguyên quyền hiện tại</strong>${existingRule?` (${e(ROLES[existingRule.role]?.label||'')} tại ${e(folder(existingRule.resourceId)?.name||'Thư mục gốc')})`:''}</span></label>`:''}
       ${['viewer','contributor','editor','manager'].map(role=>`<label class="checkbox-option"><input type="radio" name="quickRole" value="${role}" ${!id&&role==='viewer'?'checked':''} required><span><strong>${e(ROLES[role].label)}</strong><br><small>${e(ROLES[role].description)}</small></span></label>`).join('')}
-      </div></fieldset><div class="field"><label for="quickScope">Được truy cập thư mục</label><select id="quickScope" name="quickScope">${folderOptions(scope)}</select><p class="field-hint">Áp dụng cho thư mục đã chọn và thư mục con có kế thừa. Chọn “Tất cả tài liệu” để cấp quyền toàn kho. Không chuyển quyền sở hữu tổ chức.</p>${id?'<p class="field-hint">Khi chọn vai trò mới, chỉ quyền trực tiếp tại thư mục này được cập nhật. Quyền từ nhóm hoặc thư mục khác được giữ nguyên và cộng gộp.</p>':''}</div>`);
+      </div></fieldset><div class="field"><label for="quickScope">Được truy cập thư mục</label><select id="quickScope" name="quickScope">${folderOptions(scope)}</select><p class="field-hint">Áp dụng cho thư mục đã chọn và thư mục con có kế thừa. Chọn “Tất cả tài liệu” để cấp quyền toàn kho. Không chuyển quyền sở hữu tổ chức.</p>${id?'<p class="field-hint">Khi chọn vai trò mới hoặc đổi thư mục, quyền trực tiếp tại thư mục được cập nhật và lưu ngay lên máy chủ.</p>':''}</div>`);
     if(!id){$('#formTitle').textContent='Thêm nhân sự';$('#mainForm button[type="submit"]').textContent='Thêm & cấp quyền';}
   }
   function openUserForm(id=null) {
@@ -3190,6 +3193,7 @@ window.DocHubMedia={init,open,typeOf,getSession:()=>session};
       await requirePermission(rule.resourceId,'manage');
       state.acl=state.acl.filter(item=>item.id!==id);
       commit(`Thu hồi quyền của ${name}`,rule.resourceId,`Gỡ quyền trực tiếp: ${ROLES[rule.role].label}.`,'shield');
+      if(typeof window!=='undefined'&&window.DocHubAPI?.flush)await window.DocHubAPI.flush();
       toast('Đã thu hồi quyền trực tiếp.');
     }});
   }
@@ -3409,20 +3413,28 @@ function openHelp() {
         if((memberId==='u1'||id==='u1')&&!groupIds.includes('g-system'))throw new Error('Giữ tài khoản quản trị mẫu trong nhóm Quản trị hệ thống.');
         const fields={name,email,department:String(data.get('department')||'').trim(),groupIds,active:id==='u1'||data.has('active')};
         const quickRole=String(data.get('quickRole')||'keep'),quickScope=String(data.get('quickScope')||'');
-        if(quickRole!=='keep'){
-          if(!['viewer','contributor','editor','manager'].includes(quickRole))throw new Error('Vai trò không hợp lệ.');
+        const curRule=state.acl.find(r=>r.principalType==='user'&&r.principalId===memberId);
+        const effectiveRole=quickRole!=='keep'?quickRole:(curRule?.role||'viewer');
+        if(!id&&!existingPerson&&quickRole==='keep')throw new Error('Chọn vai trò cho nhân sự mới.');
+        const shouldUpdateAcl=quickRole!=='keep' || (curRule && quickScope && active(folder(quickScope)) && curRule.resourceId!==quickScope);
+        if(shouldUpdateAcl){
+          if(!['viewer','contributor','editor','manager'].includes(effectiveRole))throw new Error('Vai trò không hợp lệ.');
           if(!active(folder(quickScope)))throw new Error('Chọn thư mục được phép truy cập.');
           await requirePermission(quickScope,'manage');
-        }else if(!id&&!existingPerson)throw new Error('Chọn vai trò cho nhân sự mới.');
+        }
+
         if(existingPerson)Object.assign(existingPerson,fields);
         else if(id)Object.assign(user(id),fields);
         else state.users.push({id:memberId,...fields});
-        if(quickRole!=='keep'){
+
+        if(shouldUpdateAcl){
+          state.acl=state.acl.filter(r=>!(r.principalType==='user'&&r.principalId===memberId&&r.resourceId!==quickScope));
           const existing=state.acl.find(rule=>rule.resourceId===quickScope&&rule.principalType==='user'&&rule.principalId===memberId);
-          if(existing)existing.role=quickRole;
-          else state.acl.push({id:uid('acl'),resourceId:quickScope,principalType:'user',principalId:memberId,role:quickRole});
+          if(existing)existing.role=effectiveRole;
+          else state.acl.push({id:uid('acl'),resourceId:quickScope,principalType:'user',principalId:memberId,role:effectiveRole});
         }
         commit(id||existingPerson?'Cập nhật thành viên':'Mời thành viên','all',`${name} · ${email}. Thành viên nhóm được cập nhật.`,'user');
+        if(typeof window!=='undefined'&&window.DocHubAPI?.flush)await window.DocHubAPI.flush();
         toast(existingPerson&&!id?'Đã cập nhật thông tin và đồng bộ quyền lên máy chủ.':'Đã lưu thành viên và đồng bộ quyền lên máy chủ.');
       } else if(kind==='group') {
         await requirePermission('all','manage');
@@ -3433,7 +3445,9 @@ function openHelp() {
         const groupId=id||uid('group'),description=String(data.get('description')||'').trim();
         if(id)Object.assign(state.groups.find(group=>group.id===id),{name,description});else state.groups.push({id:groupId,name,description});
         state.users.forEach(person=>{person.groupIds=person.groupIds.filter(existing=>existing!==groupId);if(members.has(person.id))person.groupIds.push(groupId);});
-        commit(id?'Cập nhật nhóm làm việc':'Tạo nhóm làm việc','all',`${name} · ${members.size} thành viên.`,'users');toast('Đã lưu nhóm và thành viên.');
+        commit(id?'Cập nhật nhóm làm việc':'Tạo nhóm làm việc','all',`${name} · ${members.size} thành viên.`,'users');
+        if(typeof window!=='undefined'&&window.DocHubAPI?.flush)await window.DocHubAPI.flush();
+        toast('Đã lưu nhóm và thành viên.');
       } else if(kind==='access') {
         await requirePermission(id,'manage');
         const [principalType,principalId]=String(data.get('principal')).split(':'),role=String(data.get('role'));
@@ -3445,6 +3459,7 @@ function openHelp() {
         if(rule)rule.role=role;
         else {rule={id:uid('acl'),resourceId:id,principalId,principalType,role};state.acl.push(rule);}
         commit(`Cấp quyền cho ${principalName(rule)}`,id,`${previous} → ${ROLES[role].label}. Quyền trực tiếp.`,'shield');
+        if(typeof window!=='undefined'&&window.DocHubAPI?.flush)await window.DocHubAPI.flush();
         toast('Đã lưu quyền truy cập và chuyển tới Supabase.');
       } else if(kind==='workspace') {
         await requirePermission('all','manage');
@@ -3630,6 +3645,7 @@ function openHelp() {
         await requirePermission(rule.resourceId,'manage');
         const previous=rule.role;rule.role=target.value;
         commit(`Đổi vai trò của ${principalName(rule)}`,rule.resourceId,`${ROLES[previous].label} → ${ROLES[rule.role].label}.`,'shield');
+        if(typeof window!=='undefined'&&window.DocHubAPI?.flush)await window.DocHubAPI.flush();
         toast('Đã cập nhật vai trò.');
       }
     } else if(target.name==='theme') {

@@ -190,6 +190,20 @@
       localStorage.removeItem(`dochub.organization.${currentUser.id}`);
     }
     const suggestedName = currentUser.user_metadata?.full_name || currentUser.user_metadata?.name || currentUser.email;
+    // Check if user is already an active member of an existing organization before creating a new one
+    try {
+      const { data: existingMemberships } = await supabase.from('organization_members')
+        .select('organization_id, organization_role')
+        .eq('user_id', currentUser.id)
+        .eq('status', 'active')
+        .order('created_at', { ascending: false });
+      if (existingMemberships && existingMemberships.length > 0) {
+        organization = { id: existingMemberships[0].organization_id, role: existingMemberships[0].organization_role };
+        if (typeof localStorage !== 'undefined') localStorage.setItem(`dochub.organization.${currentUser.id}`, organization.id);
+        authorizationStatus = 'ready';
+        return organization;
+      }
+    } catch (_) {}
     const { data, error } = await supabase.rpc('dochub_bootstrap_organization', {
       p_name: suggestedName ? `Không gian của ${suggestedName}` : null
     });
@@ -211,7 +225,6 @@
     return (data||[]).map(m=>({id:m.organization_id,role:m.organization_role,name:m.organizations?.name||'Không gian làm việc'}));
   };
   api.switchOrganization=async(id)=>{
-    if(!organizationBackend)throw new Error('Cần triển khai backend tổ chức trước khi chuyển không gian.');
     const memberships=await api.listOrganizations();
     if(!memberships.some(m=>m.id===id))throw new Error('Bạn không còn là thành viên của không gian này.');
     let failed=false;
@@ -594,6 +607,47 @@
       } catch (_) {}
     }
 
+    async function syncAclFromDatabase(targetState) {
+      if (!targetState) return;
+      if (!organization) await ensureOrganization();
+      if (!organization?.id) return;
+      try {
+        const { data: dbAcl, error } = await supabase
+          .from('folder_acl_entries')
+          .select('*, organization_members(app_user_uid, user_id, email), organization_groups(app_group_uid)')
+          .eq('organization_id', organization.id);
+        if (!error && Array.isArray(dbAcl) && dbAcl.length) {
+          if (!Array.isArray(targetState.acl)) targetState.acl = [];
+          const existingMap = new Map();
+          for (const rule of targetState.acl) {
+            existingMap.set(`${rule.resourceId}:${rule.principalType}:${rule.principalId}`, rule);
+          }
+          for (const entry of dbAcl) {
+            const isMember = entry.principal_type === 'member';
+            const principalId = isMember
+              ? (entry.organization_members?.app_user_uid || entry.organization_members?.user_id)
+              : (entry.organization_groups?.app_group_uid);
+            if (!principalId) continue;
+            const key = `${entry.folder_uid}:${isMember ? 'user' : 'group'}:${principalId}`;
+            const existing = existingMap.get(key);
+            if (existing) {
+              existing.role = entry.role;
+            } else {
+              targetState.acl.push({
+                id: 'acl-' + entry.id,
+                resourceId: entry.folder_uid,
+                principalType: isMember ? 'user' : 'group',
+                principalId,
+                role: entry.role
+              });
+            }
+          }
+        }
+      } catch (err) {
+        console.warn('DocHub syncAclFromDatabase:', err);
+      }
+    }
+
     if(organizationBackend){
       try{
         const result=await (await backend('workspace')).json();
@@ -601,6 +655,7 @@
           await syncMembersFromDatabase(result.state);
           await syncFoldersFromDatabase(result.state);
           await syncDocumentsFromDatabase(result.state);
+          await syncAclFromDatabase(result.state);
         }
         loadedSharedState=result.state;
         revision=result.revision||1;
@@ -632,6 +687,7 @@
         await syncMembersFromDatabase(data.state);
         await syncFoldersFromDatabase(data.state);
         await syncDocumentsFromDatabase(data.state);
+        await syncAclFromDatabase(data.state);
         driveSharingEnabled = data.state.preferences?.driveSharingEnabled === true;
         workspaceLoadStatus = 'loaded';
         revision = data.revision || 1;
