@@ -2302,8 +2302,12 @@ window.DocHubMedia={init,open,typeOf,getSession:()=>session};
         if(authKey){
           const parsed=JSON.parse(localStorage.getItem(authKey)||'{}');
           accountId=parsed?.user?.id;
-          if(accountId){orgId=localStorage.getItem(`dochub.organization.${accountId}`)||'personal';}
         }
+      }catch(_){}
+    }
+    if(accountId && !orgId && typeof localStorage!=='undefined'){
+      try{
+        orgId=localStorage.getItem(`dochub.organization.${accountId}`)||null;
       }catch(_){}
     }
     return accountId?`${STORAGE_KEY_BASE}.${accountId}.${orgId||'personal'}`:`${STORAGE_KEY_BASE}.guest`;
@@ -3102,6 +3106,9 @@ window.DocHubMedia={init,open,typeOf,getSession:()=>session};
     confirmAction({title:empty?'Dọn toàn bộ thùng rác?':'Xóa vĩnh viễn?',description:`${targets.length} mục và các tệp gốc tương ứng sẽ bị xóa khỏi bộ nhớ của bản mẫu trên thiết bị này.\nThao tác này không thể hoàn tác.`,danger:true,label:'Xóa vĩnh viễn',onConfirm:async()=>{
       const removed=new Set(targets.map(item=>item.id));
       for(const item of targets.filter(i=>i.kind==='file'))await removeAsset(item.id,item.parentId);
+      for(const item of targets.filter(i=>i.kind==='folder')){
+        if(window.DocHubAPI?.removeFolder) await window.DocHubAPI.removeFolder(item.id);
+      }
       state.folders=state.folders.filter(item=>!removed.has(item.id));
       state.documents=state.documents.filter(item=>!removed.has(item.id));
       state.acl=state.acl.filter(rule=>!removed.has(rule.resourceId));

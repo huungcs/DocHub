@@ -496,7 +496,7 @@
               if (df.parent_uid !== undefined) existing.parentId = df.parent_uid;
               if (df.description !== undefined) existing.description = df.description || '';
               if (df.inherit_permissions !== undefined) existing.inherit = df.inherit_permissions !== false;
-              if (df.deleted_at) existing.deletedAt = df.deleted_at;
+              if (df.deleted_at !== undefined) existing.deletedAt = df.deleted_at || null;
             } else {
               targetState.folders.push({
                 id: df.folder_uid,
@@ -533,7 +533,7 @@
               if (dd.parent_folder_id) existing.parentId = dd.parent_folder_id;
               if (dd.bytes) existing.bytes = Number(dd.bytes);
               if (dd.mime_type) existing.mime = dd.mime_type;
-              if (dd.deleted_at) existing.deletedAt = dd.deleted_at;
+              if (dd.deleted_at !== undefined) existing.deletedAt = dd.deleted_at || null;
               existing.assetStorage = 'server';
             } else {
               targetState.documents.push({
@@ -923,6 +923,18 @@
       const { error } = await deletion;
       if (error) throw error;
     }
+  };
+
+  /**
+   * Xóa thư mục vĩnh viễn khỏi tổ chức
+   */
+  api.removeFolder = async (folderUid) => {
+    if (!currentUser || !supabase) return;
+    if (!organization) await ensureOrganization();
+    if (!organization?.id) return;
+    try {
+      await supabase.from('organization_folders').delete().eq('organization_id', organization.id).eq('folder_uid', folderUid);
+    } catch (_) {}
   };
 
   /**
