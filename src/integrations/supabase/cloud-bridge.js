@@ -367,10 +367,13 @@
     }
 
     try {
-      const status=await (await backend('status')).json();organizationBackend=true;
+      let status=await (await backend('status')).json();
       if(organization.role==='owner'&&session.provider_refresh_token&&(!status.connected||event==='SIGNED_IN')){
         await backend('connect',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({refreshToken:session.provider_refresh_token})});
-      }else if(organization.role==='owner'&&!status.connected){
+        status = { connected: true };
+      }
+      organizationBackend = status?.connected === true;
+      if(organization.role==='owner'&&!status?.connected){
         authError='Mở menu tài khoản → Kết nối lại Google Drive để cấp quyền cho kho doanh nghiệp.';
       }
     }catch(error){authError=error.message;console.warn('Kho doanh nghiệp:',error.message);}

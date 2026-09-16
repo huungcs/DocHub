@@ -2483,10 +2483,10 @@ window.DocHubMedia={init,open,typeOf,getSession:()=>session};
       if(DocHubAPI.conflict)throw new Error('Dữ liệu đã thay đổi ở nơi khác. Tải lại trước khi lưu.');
       try{const result=await DocHubAPI.putAsset(id,file,parentFolderId,options);return result?.driveStored?'server':'device';}
       catch(error){
-        if(window.DocHubAPI?.usesOrganizationBackend)throw error;
         if(error?.code==='permission_denied'||/không có quyền/i.test(error?.message||''))throw error;
         if(error?.name==='AbortError')throw error;
-        toast('Chưa lưu được lên máy chủ. Đang thử lưu trên trình duyệt này.','warning');
+        if(window.DocHubAPI?.usesOrganizationBackend && !/kết nối kho Drive/i.test(error?.message||''))throw error;
+        toast('Chưa kết nối kho Drive doanh nghiệp. Đã lưu tài liệu an toàn trên thiết bị này.','warning');
       }
     }
     try{await assetOperation('readwrite','put',id,file);sessionFiles.delete(id);return 'device';}
