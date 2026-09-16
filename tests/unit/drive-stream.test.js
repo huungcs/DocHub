@@ -42,3 +42,11 @@ test('Spreadsheet preview supports two-finger zoom and hides a redundant single-
   assert.match(template, /Math\.max\(\.6,Math\.min\(2\.2,value\)\)/);
   assert.match(template, /sheet-pager:has\([^\n]+disabled[^\n]+disabled/);
 });
+
+test('Mobile PDF preview scrolls continuously and uses pinch zoom without a toolbar', () => {
+  assert.match(template, /function renderMobilePDF\(\)/);
+  assert.match(template, /pdf-continuous-page/);
+  assert.match(template, /IntersectionObserver/);
+  assert.match(template, /function bindPDFPinch\(\)/);
+  assert.match(template, /max-width:700px[^\n]+s\.mode!==['"]edit['"]/);
+});
