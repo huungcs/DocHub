@@ -35,3 +35,10 @@ test('Media studio prefers Drive streaming and keeps Blob fallback', () => {
   assert.match(template, /session\.stream\?null:await bridge\.blob\(item\)/);
   assert.match(template, /s\.stream\?\.url\|\|url\(s\.blob\)/);
 });
+
+test('Spreadsheet preview supports two-finger zoom and hides a redundant single-page pager', () => {
+  assert.match(template, /function bindSheetPinch\(\)/);
+  assert.match(template, /touchmove[\s\S]*event\.preventDefault\(\)/);
+  assert.match(template, /Math\.max\(\.6,Math\.min\(2\.2,value\)\)/);
+  assert.match(template, /sheet-pager:has\([^\n]+disabled[^\n]+disabled/);
+});
