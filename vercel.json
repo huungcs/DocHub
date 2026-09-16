@@ -39,7 +39,7 @@
   ],
   "rewrites": [
     {
-      "source": "/((?!api/|assets/|robots\\.txt|sitemap\\.xml|favicon\\.ico|drive-stream-sw\\.js).*)",
+      "source": "/((?!api/|assets/|robots\\.txt|sitemap\\.xml|favicon\\.ico|drive-stream-sw\\.js|privacy|terms).*)",
       "destination": "/index.html"
     }
   ]

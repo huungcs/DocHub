@@ -364,7 +364,9 @@ const staticSeoFiles = [
   ['robots.txt', path.join(distPath, 'robots.txt')],
   ['sitemap.xml', path.join(distPath, 'sitemap.xml')],
   ['src/assets/og-image.png', path.join(assetsPath, 'og-image.png')],
-  ['src/assets/og-image.svg', path.join(assetsPath, 'og-image.svg')]
+  ['src/assets/og-image.svg', path.join(assetsPath, 'og-image.svg')],
+  ['src/app/privacy.html', path.join(distPath, 'privacy.html')],
+  ['src/app/terms.html', path.join(distPath, 'terms.html')]
 ];
 
 for (const [src, dst] of staticSeoFiles) {
