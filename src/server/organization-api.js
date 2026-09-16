@@ -93,18 +93,23 @@ function createApi(env=process.env,fetcher=fetch,logger=console){
     // on both visibility queries; never cache permission-filtered results globally.
     const [rows,visible,docs]=await Promise.all([
      db(`user_workspaces?user_id=eq.${c.organization.owner_id}&select=state,revision`),
-     db(`organization_folders?organization_id=eq.${c.org}&select=folder_uid`,{},c.bearer),
+     db(`organization_folders?organization_id=eq.${c.org}&select=*`,{},c.bearer),
      db(`documents_index?organization_id=eq.${c.org}&select=*`,{},c.bearer)
     ]);const state=rows[0]?.state;
     if(!state){result={state:null};}else{
+     const output=structuredClone(state),folders=output.folders||[];
+     for(const vf of visible){
+       if(!folders.some(f=>f.id===vf.folder_uid)){
+         folders.push({id:vf.folder_uid,parentId:vf.parent_uid,name:vf.name,description:vf.description||'',kind:'folder',inherit:vf.inherit_permissions!==false,deletedAt:vf.deleted_at||null});
+       }
+     }
      const ids=new Set(visible.map(f=>f.folder_uid));
-     const output=structuredClone(state),folders=state.folders||[],ancestors=new Set(['all']),folderById=new Map(folders.map(f=>[f.id,f]));
+     const ancestors=new Set(['all']),folderById=new Map(folders.map(f=>[f.id,f]));
      for(const f of folders.filter(f=>ids.has(f.id))){let cursor=f,seen=new Set();while(cursor&&!seen.has(cursor.id)){seen.add(cursor.id);ancestors.add(cursor.id);cursor=folderById.get(cursor.parentId);}}
      output.folders=folders.filter(f=>ancestors.has(f.id)).map(f=>ids.has(f.id)?f:{id:f.id,parentId:f.parentId,name:f.name,kind:'folder',inherit:false,deletedAt:null});
-     // Account snapshots are legacy data shared by multiple organizations.
-     // Only the organization-scoped, RLS-filtered index can establish file membership.
-     // Never infer membership from a matching folder ID or filename.
-     output.documents=[];
+     const serverDocIds=new Set(docs.map(d=>d.doc_uid));
+     const deviceDocs=(output.documents||[]).filter(d=>d.assetStorage==='device'&&!serverDocIds.has(d.id));
+     output.documents=[...deviceDocs];
      for(const d of docs){output.documents.push({id:d.doc_uid,parentId:d.parent_folder_id,name:d.name,description:d.description||'',ext:documentExtension(d.ext,d.mime_type,d.name),bytes:d.bytes,mime:d.mime_type,kind:'file',ownerId:'u1',source:'upload',assetStorage:'server',createdAt:d.created_at,updatedAt:d.updated_at,deletedAt:d.deleted_at||null});}
      if(!['owner','admin'].includes(c.member.organization_role)){output.logs=[];output.acl=[];output.groups=[];output.users=[{id:'u1',name:c.user.user_metadata?.full_name||c.user.email,email:c.user.email,groupIds:[],active:true}];}
      output.preferences={...output.preferences,driveSharingEnabled:false};result={state:output,revision:rows[0].revision};

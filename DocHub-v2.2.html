@@ -2401,7 +2401,10 @@ window.DocHubMedia={init,open,typeOf,getSession:()=>session};
   function saveState() {
     state.preferences.expanded=[...ui.expanded];
     state.preferences.lastFolder=ui.folder;
-    if(window.DocHubAPI?.workspaceLoadStatus!=='error')window.DocHubAPI?.scheduleState(state);
+    const api = window.DocHubAPI;
+    if (api?.connected && (api.workspaceLoadStatus === 'loaded' || api.workspaceLoadStatus === 'not_found')) {
+      api.scheduleState(state);
+    }
     try {localStorage.setItem(stateStorageKey(),JSON.stringify(state));return true;}
     catch(error) {toast('Không thể lưu cục bộ. Thay đổi hiện chỉ tồn tại trong phiên này.','warning');return false;}
   }
@@ -3806,7 +3809,7 @@ function openHelp() {
       const cleanUrl = (ui.folder === 'all') ? (window.location.pathname || '/') : `?folder=${encodeURIComponent(ui.folder)}`;
       try { history.replaceState({folder: ui.folder}, '', cleanUrl); } catch(e) {}
     }
-    syncNavigation();renderAll();saveState();
+    syncNavigation();renderAll();
     document.title=`${folder(ui.folder).name} — DocHub`;
     if(storageWarning)setTimeout(()=>toast(storageWarning,'warning'),350);
     document.dispatchEvent(new Event('dochub:ready'));
@@ -3816,6 +3819,17 @@ function openHelp() {
         const serverState = await window.DocHubAPI.loadState();
         const account = window.DocHubAPI?.connected ? window.DocHubAPI.user : null;
         if(account && serverState && validState(serverState)) {
+          const localDocs = (state.documents || []).filter(d => d.assetStorage === 'device');
+          for (const ld of localDocs) {
+            if (!serverState.documents.some(d => d.id === ld.id)) {
+              serverState.documents.push(ld);
+            }
+          }
+          for (const lf of (state.folders || [])) {
+            if (!serverState.folders.some(f => f.id === lf.id)) {
+              serverState.folders.push(lf);
+            }
+          }
           const currentDocs = JSON.stringify(state.documents);
           const newDocs = JSON.stringify(serverState.documents);
           const currentFolders = JSON.stringify(state.folders);

@@ -480,11 +480,92 @@
       } catch (_) {}
     }
 
+    async function syncFoldersFromDatabase(targetState) {
+      if (!targetState) return;
+      if (!organization) await ensureOrganization();
+      if (!organization?.id) return;
+      try {
+        const { data: dbFolders, error } = await supabase.from('organization_folders').select('*').eq('organization_id', organization.id);
+        if (!error && Array.isArray(dbFolders) && dbFolders.length) {
+          if (!Array.isArray(targetState.folders)) targetState.folders = [];
+          const folderMap = new Map(targetState.folders.map(f => [f.id, f]));
+          for (const df of dbFolders) {
+            const existing = folderMap.get(df.folder_uid);
+            if (existing) {
+              if (df.name) existing.name = df.name;
+              if (df.parent_uid !== undefined) existing.parentId = df.parent_uid;
+              if (df.description !== undefined) existing.description = df.description || '';
+              if (df.inherit_permissions !== undefined) existing.inherit = df.inherit_permissions !== false;
+              if (df.deleted_at) existing.deletedAt = df.deleted_at;
+            } else {
+              targetState.folders.push({
+                id: df.folder_uid,
+                parentId: df.parent_uid,
+                name: df.name,
+                description: df.description || '',
+                kind: 'folder',
+                inherit: df.inherit_permissions !== false,
+                ownerId: 'u1',
+                createdAt: df.created_at || new Date().toISOString(),
+                updatedAt: df.updated_at || new Date().toISOString(),
+                starred: false,
+                deletedAt: df.deleted_at || null
+              });
+            }
+          }
+        }
+      } catch (_) {}
+    }
+
+    async function syncDocumentsFromDatabase(targetState) {
+      if (!targetState) return;
+      if (!organization) await ensureOrganization();
+      if (!organization?.id) return;
+      try {
+        const { data: dbDocs, error } = await supabase.from('documents_index').select('*').eq('organization_id', organization.id);
+        if (!error && Array.isArray(dbDocs) && dbDocs.length) {
+          if (!Array.isArray(targetState.documents)) targetState.documents = [];
+          const docMap = new Map(targetState.documents.map(d => [d.id, d]));
+          for (const dd of dbDocs) {
+            const existing = docMap.get(dd.doc_uid);
+            if (existing) {
+              if (dd.name) existing.name = dd.name;
+              if (dd.parent_folder_id) existing.parentId = dd.parent_folder_id;
+              if (dd.bytes) existing.bytes = Number(dd.bytes);
+              if (dd.mime_type) existing.mime = dd.mime_type;
+              if (dd.deleted_at) existing.deletedAt = dd.deleted_at;
+              existing.assetStorage = 'server';
+            } else {
+              targetState.documents.push({
+                id: dd.doc_uid,
+                parentId: dd.parent_folder_id || 'all',
+                name: dd.name,
+                description: dd.description || '',
+                ext: dd.ext || dd.name.split('.').pop() || 'bin',
+                bytes: Number(dd.bytes) || 0,
+                mime: dd.mime_type || 'application/octet-stream',
+                kind: 'file',
+                ownerId: 'u1',
+                source: 'upload',
+                assetStorage: 'server',
+                createdAt: dd.created_at || new Date().toISOString(),
+                updatedAt: dd.updated_at || new Date().toISOString(),
+                starred: dd.starred === true,
+                deletedAt: dd.deleted_at || null
+              });
+            }
+          }
+        }
+      } catch (_) {}
+    }
+
     if(organizationBackend){
       try{
         const result=await (await backend('workspace')).json();
         if(result.state){
           await syncMembersFromDatabase(result.state);
+          await syncFoldersFromDatabase(result.state);
+          await syncDocumentsFromDatabase(result.state);
         }
         loadedSharedState=result.state;
         revision=result.revision||1;
@@ -514,6 +595,8 @@
 
       if (data && data.state) {
         await syncMembersFromDatabase(data.state);
+        await syncFoldersFromDatabase(data.state);
+        await syncDocumentsFromDatabase(data.state);
         driveSharingEnabled = data.state.preferences?.driveSharingEnabled === true;
         workspaceLoadStatus = 'loaded';
         revision = data.revision || 1;
