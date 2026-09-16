@@ -3889,7 +3889,7 @@ function openHelp() {
               serverState.folders.unshift({id:'all',parentId:null,name:'Tất cả tài liệu',description:'Không gian chung cho tài liệu và tri thức doanh nghiệp.',kind:'folder',inherit:false,ownerId:'u1',createdAt:new Date().toISOString(),updatedAt:new Date().toISOString(),starred:false,deletedAt:null});
             }
             serverState.documents = (serverState.documents || []).filter(d => !d.sample && d.source !== 'sample' && d.source !== 'bundled' && !DEMO_FOLDER_UIDS.includes(d.parentId));
-            const localDocs = (state.documents || []).filter(d => d.assetStorage === 'device' && !d.sample && d.source !== 'sample' && d.source !== 'bundled' && !DEMO_FOLDER_UIDS.includes(d.parentId));
+            const localDocs = (state.documents || []).filter(d => d.assetStorage === 'device' && !d.sample && d.source !== 'sample' && d.source !== 'bundled' && !DEMO_FOLDER_UIDS.includes(d.parentId) && serverState.folders.some(f => f.id === d.parentId));
             for (const ld of localDocs) {
               if (!serverState.documents.some(d => d.id === ld.id)) {
                 serverState.documents.push(ld);
