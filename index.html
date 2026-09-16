@@ -2189,6 +2189,13 @@ window.DocHubMedia={init,open,typeOf,getSession:()=>session};
   const initials = name => name.split(/\s+/).filter(Boolean).slice(-2).map(s=>s[0]).join('').toUpperCase();
   const ago = days => new Date(Date.now()-days*86400000).toISOString();
 
+  const DEMO_FOLDER_UIDS = [
+    'board','board-docs','executive','business','business-plan','customers',
+    'admin','salary','salary-forms','allowance','discipline','administration',
+    'finance','sales-policy','finance-reports','hr','recruitment','training',
+    'employee-records','processes','production','admin-processes','archive','supplier-contracts'
+  ];
+
   function createSeed() {
     const folderRows = [
       ['all',null,'Tất cả tài liệu','Không gian chung cho tài liệu và tri thức doanh nghiệp.'],
@@ -2276,12 +2283,11 @@ window.DocHubMedia={init,open,typeOf,getSession:()=>session};
   }
 
   function createCloudWorkspace(account) {
-    const seed=createSeed();
     const name=account?.user_metadata?.full_name||account?.user_metadata?.name||account?.email?.split('@')[0]||'Người dùng';
     const email=account?.email||'';
-    const root={...seed.folders.find(folder=>folder.id==='all'),ownerId:'u1',createdAt:new Date().toISOString(),updatedAt:new Date().toISOString()};
+    const root={id:'all',parentId:null,name:'Tất cả tài liệu',description:'Không gian chung cho tài liệu và tri thức doanh nghiệp.',kind:'folder',inherit:false,ownerId:'u1',createdAt:new Date().toISOString(),updatedAt:new Date().toISOString(),starred:false,deletedAt:null};
     return {
-      ...seed,
+      version:1,
       folders:[root],documents:[],
       users:[{id:'u1',name,email,department:'',groupIds:['g-system'],active:true}],
       groups:[{id:'g-system',name:'Quản trị hệ thống',description:'Chủ sở hữu không gian làm việc'}],
@@ -2346,31 +2352,52 @@ window.DocHubMedia={init,open,typeOf,getSession:()=>session};
     } catch(error) { storageWarning='Trình duyệt không đọc được dữ liệu cục bộ. Bản mẫu vẫn dùng được trong phiên này.'; }
     return null;
   }
+  const isDemoSession = (typeof sessionStorage !== 'undefined' && sessionStorage.getItem('dochub.demo_mode') === 'true') ||
+    (typeof localStorage !== 'undefined' && localStorage.getItem('dochub.demo_mode') === 'true');
+  let authAccount = null;
+  if (typeof localStorage !== 'undefined') {
+    try {
+      const authKey = Object.keys(localStorage).find(k => k.startsWith('sb-') && k.endsWith('-auth-token'));
+      if (authKey) authAccount = JSON.parse(localStorage.getItem(authKey) || '{}')?.user;
+    } catch (_) {}
+  }
   const localState=loadState();
-  const cloudAccount=window.DocHubAPI?.connected?window.DocHubAPI.user:null;
-  let state=localState&&validState(localState)?localState:
-    cloudAccount?createCloudWorkspace(cloudAccount):createSeed();
+  const cloudAccount=window.DocHubAPI?.connected?window.DocHubAPI.user:(isDemoSession?null:authAccount);
+  let state=localState&&validState(localState)?localState:cloudAccount?createCloudWorkspace(cloudAccount):createSeed();
+  if (cloudAccount) {
+    if (state && Array.isArray(state.folders)) {
+      state.folders = state.folders.filter(f => !DEMO_FOLDER_UIDS.includes(f.id));
+      if (!state.folders.some(f => f.id === 'all')) {
+        state.folders.unshift({id:'all',parentId:null,name:'Tất cả tài liệu',description:'Không gian chung cho tài liệu và tri thức doanh nghiệp.',kind:'folder',inherit:false,ownerId:'u1',createdAt:new Date().toISOString(),updatedAt:new Date().toISOString(),starred:false,deletedAt:null});
+      }
+    }
+    if (state && Array.isArray(state.documents)) {
+      state.documents = state.documents.filter(d => !d.sample && d.source !== 'sample' && d.source !== 'bundled' && !DEMO_FOLDER_UIDS.includes(d.parentId));
+    }
+  }
   // Add real, bundled multimedia samples once; never resurrect deleted records.
   function upgradeSamples() {
-  if(!state.mediaUpgrade) {
-    for(const seed of (window.DocHubSamples?.documents||[])) {
-      if(!state.folders.some(f=>f.id===seed.parentId&&!f.deletedAt))continue;
-      const old=state.documents.find(d=>d.id===seed.id);
-      if(old && !old.sample)continue;
-      if(old?.deletedAt)continue;
-      const item={...seed,kind:'file',sample:false,source:'bundled',ownerId:'u2',starred:false,
-        createdAt:ago(3),updatedAt:ago(1),deletedAt:null};
-      if(old)Object.assign(old,{ext:item.ext,bytes:item.bytes,mime:item.mime,demoKey:item.demoKey,source:item.source,sample:false});else state.documents.push(item);
+    if (cloudAccount || !isDemoSession) return;
+    if(!state.mediaUpgrade) {
+      for(const seed of (window.DocHubSamples?.documents||[])) {
+        if(!state.folders.some(f=>f.id===seed.parentId&&!f.deletedAt))continue;
+        const old=state.documents.find(d=>d.id===seed.id);
+        if(old && !old.sample)continue;
+        if(old?.deletedAt)continue;
+        const item={...seed,kind:'file',sample:false,source:'bundled',ownerId:'u2',starred:false,
+          createdAt:ago(3),updatedAt:ago(1),deletedAt:null};
+        if(old)Object.assign(old,{ext:item.ext,bytes:item.bytes,mime:item.mime,demoKey:item.demoKey,source:item.source,sample:false});else state.documents.push(item);
+      }
+      state.mediaUpgrade=2;
     }
-    state.mediaUpgrade=2;
-  }
   }
   upgradeSamples();
+  const defaultFolder = (cloudAccount || !active(folder(state.preferences.lastFolder))) ? 'all' : (state.preferences.lastFolder || 'all');
   const ui={
-    folder:state.preferences.lastFolder || 'salary',
-    expanded:new Set(state.preferences.expanded || ['admin']),
+    folder: defaultFolder,
+    expanded: new Set(state.preferences.expanded?.filter(id => !DEMO_FOLDER_UIDS.includes(id)) || ['all']),
     tab:'all',query:'',localQuery:'',treeQuery:'',page:1,selected:new Set(),filters:{},filtersOpen:false,
-    settings:'users',settingsQuery:'',permissionFolder:'salary',inspectUser:state.users[0]?.id||'',
+    settings:'users',settingsQuery:'',permissionFolder: defaultFolder,inspectUser:state.users[0]?.id||'',
     previewId:null,previewTab:'preview',previewUrls:[],uploading:false
   };
   const folder = id => state.folders.find(f=>f.id===id);
@@ -3916,28 +3943,38 @@ function openHelp() {
       try {
         const serverState = await window.DocHubAPI.loadState();
         const account = window.DocHubAPI?.connected ? window.DocHubAPI.user : null;
-        if(account && serverState && validState(serverState)) {
-          const localDocs = (state.documents || []).filter(d => d.assetStorage === 'device');
-          for (const ld of localDocs) {
-            if (!serverState.documents.some(d => d.id === ld.id)) {
-              serverState.documents.push(ld);
+        if(account) {
+          if (serverState && validState(serverState)) {
+            const hadDemoFolders = (serverState.folders || []).some(f => DEMO_FOLDER_UIDS.includes(f.id));
+            const hadDemoDocs = (serverState.documents || []).some(d => d.sample || d.source === 'sample' || d.source === 'bundled' || DEMO_FOLDER_UIDS.includes(d.parentId));
+            serverState.folders = (serverState.folders || []).filter(f => !DEMO_FOLDER_UIDS.includes(f.id));
+            if (!serverState.folders.some(f => f.id === 'all')) {
+              serverState.folders.unshift({id:'all',parentId:null,name:'Tất cả tài liệu',description:'Không gian chung cho tài liệu và tri thức doanh nghiệp.',kind:'folder',inherit:false,ownerId:'u1',createdAt:new Date().toISOString(),updatedAt:new Date().toISOString(),starred:false,deletedAt:null});
             }
-          }
-          for (const lf of (state.folders || [])) {
-            if (!serverState.folders.some(f => f.id === lf.id)) {
-              serverState.folders.push(lf);
+            serverState.documents = (serverState.documents || []).filter(d => !d.sample && d.source !== 'sample' && d.source !== 'bundled' && !DEMO_FOLDER_UIDS.includes(d.parentId));
+            const localDocs = (state.documents || []).filter(d => d.assetStorage === 'device' && !d.sample && d.source !== 'sample' && d.source !== 'bundled' && !DEMO_FOLDER_UIDS.includes(d.parentId));
+            for (const ld of localDocs) {
+              if (!serverState.documents.some(d => d.id === ld.id)) {
+                serverState.documents.push(ld);
+              }
             }
-          }
-          const currentDocs = JSON.stringify(state.documents);
-          const newDocs = JSON.stringify(serverState.documents);
-          const currentFolders = JSON.stringify(state.folders);
-          const newFolders = JSON.stringify(serverState.folders);
-          if (currentDocs !== newDocs || currentFolders !== newFolders) {
             state = serverState;
-            upgradeSamples();
+            if (DEMO_FOLDER_UIDS.includes(ui.folder) || !active(folder(ui.folder))) ui.folder = 'all';
             syncNavigation();
             renderAll();
             try { localStorage.setItem(stateStorageKey(), JSON.stringify(state)); } catch(_) {}
+            if ((hadDemoFolders || hadDemoDocs) && window.DocHubAPI?.scheduleState) {
+              window.DocHubAPI.scheduleState(state);
+            }
+          } else if (serverState === null) {
+            state = createCloudWorkspace(account);
+            ui.folder = 'all';
+            syncNavigation();
+            renderAll();
+            try { localStorage.setItem(stateStorageKey(), JSON.stringify(state)); } catch(_) {}
+            if (window.DocHubAPI?.scheduleState) {
+              window.DocHubAPI.scheduleState(state);
+            }
           }
         }
       } catch(error) {

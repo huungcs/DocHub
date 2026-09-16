@@ -1,3 +1,10 @@
+const DEMO_FOLDER_UIDS = Object.freeze([
+  'board','board-docs','executive','business','business-plan','customers',
+  'admin','salary','salary-forms','allowance','discipline','administration',
+  'finance','sales-policy','finance-reports','hr','recruitment','training',
+  'employee-records','processes','production','admin-processes','archive','supplier-contracts'
+]);
+
 /**
  * DocHub Cloud Bridge
  * Kết nối giao diện DocHub với Supabase Database & Google Drive API
@@ -537,6 +544,7 @@
           if (!Array.isArray(targetState.folders)) targetState.folders = [];
           const folderMap = new Map(targetState.folders.map(f => [f.id, f]));
           for (const df of dbFolders) {
+            if (DEMO_FOLDER_UIDS.includes(df.folder_uid)) continue;
             const existing = folderMap.get(df.folder_uid);
             if (existing) {
               if (df.name) existing.name = df.name;
@@ -574,6 +582,7 @@
           if (!Array.isArray(targetState.documents)) targetState.documents = [];
           const docMap = new Map(targetState.documents.map(d => [d.id, d]));
           for (const dd of dbDocs) {
+            if (DEMO_FOLDER_UIDS.includes(dd.parent_folder_id)) continue;
             const existing = docMap.get(dd.doc_uid);
             if (existing) {
               if (dd.name) existing.name = dd.name;
@@ -622,6 +631,7 @@
             existingMap.set(`${rule.resourceId}:${rule.principalType}:${rule.principalId}`, rule);
           }
           for (const entry of dbAcl) {
+            if (DEMO_FOLDER_UIDS.includes(entry.folder_uid)) continue;
             const isMember = entry.principal_type === 'member';
             const principalId = isMember
               ? (entry.organization_members?.app_user_uid || entry.organization_members?.user_id)
@@ -647,14 +657,30 @@
       }
     }
 
+    function sanitizeCleanState(st) {
+      if (!st) return st;
+      if (Array.isArray(st.folders)) {
+        st.folders = st.folders.filter(f => !DEMO_FOLDER_UIDS.includes(f.id));
+      }
+      if (Array.isArray(st.documents)) {
+        st.documents = st.documents.filter(d => !d.sample && d.source !== 'sample' && d.source !== 'bundled' && !DEMO_FOLDER_UIDS.includes(d.parentId));
+      }
+      if (Array.isArray(st.acl)) {
+        st.acl = st.acl.filter(a => !DEMO_FOLDER_UIDS.includes(a.resourceId));
+      }
+      return st;
+    }
+
     if(organizationBackend){
       try{
         const result=await (await backend('workspace')).json();
         if(result.state){
+          sanitizeCleanState(result.state);
           await syncMembersFromDatabase(result.state);
           await syncFoldersFromDatabase(result.state);
           await syncDocumentsFromDatabase(result.state);
           await syncAclFromDatabase(result.state);
+          sanitizeCleanState(result.state);
         }
         loadedSharedState=result.state;
         revision=result.revision||1;
@@ -663,7 +689,10 @@
         return result.state;
       }catch(error){
         const cached=await cacheGet('meta', userCacheKey('workspace_state'));
-        if(cached?.state){loadedSharedState=cached.state;revision=cached.revision||1;workspaceLoadStatus='loaded';return cached.state;}
+        if(cached?.state){
+          sanitizeCleanState(cached.state);
+          loadedSharedState=cached.state;revision=cached.revision||1;workspaceLoadStatus='loaded';return cached.state;
+        }
         workspaceLoadStatus='error';throw error;
       }
     }
@@ -676,17 +705,22 @@
 
       if (error) {
         const cached=await cacheGet('meta', userCacheKey('workspace_state'));
-        if(cached?.state){workspaceLoadStatus='loaded';revision=cached.revision||1;return cached.state;}
+        if(cached?.state){
+          sanitizeCleanState(cached.state);
+          workspaceLoadStatus='loaded';revision=cached.revision||1;return cached.state;
+        }
         workspaceLoadStatus = 'error';
         console.warn('Lỗi đọc dữ liệu từ máy chủ đám mây:', error);
         return null;
       }
 
       if (data && data.state) {
+        sanitizeCleanState(data.state);
         await syncMembersFromDatabase(data.state);
         await syncFoldersFromDatabase(data.state);
         await syncDocumentsFromDatabase(data.state);
         await syncAclFromDatabase(data.state);
+        sanitizeCleanState(data.state);
         driveSharingEnabled = data.state.preferences?.driveSharingEnabled === true;
         workspaceLoadStatus = 'loaded';
         revision = data.revision || 1;
@@ -700,7 +734,10 @@
       return null;
     } catch (err) {
       const cached=await cacheGet('meta', userCacheKey('workspace_state'));
-      if(cached?.state){workspaceLoadStatus='loaded';revision=cached.revision||1;return cached.state;}
+      if(cached?.state){
+        sanitizeCleanState(cached.state);
+        workspaceLoadStatus='loaded';revision=cached.revision||1;return cached.state;
+      }
       workspaceLoadStatus = 'error';
       console.error('DocHub loadState failed:', err);
       return null;
@@ -744,21 +781,28 @@
         }
         if (!organization) await ensureOrganization();
         if (organization && ['owner', 'admin'].includes(organization.role)) {
+          const cleanFolders = (snapshot.folders || []).filter(f => !DEMO_FOLDER_UIDS.includes(f.id));
           const { error: authorizationError } = await supabase.rpc('dochub_sync_authorization_snapshot', {
             p_organization_id: organization.id,
-            p_folders: snapshot.folders || [],
+            p_folders: cleanFolders,
             p_users: snapshot.users || [],
             p_groups: snapshot.groups || [],
-            p_acl: snapshot.acl || []
+            p_acl: (snapshot.acl || []).filter(a => !DEMO_FOLDER_UIDS.includes(a.resourceId))
           });
           if (authorizationError) throw authorizationError;
         }
         const nextRevision = revision + 1;
+        const cleanSnapshot = {
+          ...snapshot,
+          folders: (snapshot.folders || []).filter(f => !DEMO_FOLDER_UIDS.includes(f.id)),
+          documents: (snapshot.documents || []).filter(d => !d.sample && d.source !== 'sample' && d.source !== 'bundled' && !DEMO_FOLDER_UIDS.includes(d.parentId)),
+          acl: (snapshot.acl || []).filter(a => !DEMO_FOLDER_UIDS.includes(a.resourceId))
+        };
         const { error } = await supabase
           .from('user_workspaces')
           .upsert({
             user_id: currentUser.id,
-            state: snapshot,
+            state: cleanSnapshot,
             revision: nextRevision,
             updated_at: new Date().toISOString()
           }, { onConflict: 'user_id' });

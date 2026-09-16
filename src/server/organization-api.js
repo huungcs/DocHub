@@ -1,3 +1,10 @@
+const DEMO_FOLDER_UIDS = [
+  'board','board-docs','executive','business','business-plan','customers',
+  'admin','salary','salary-forms','allowance','discipline','administration',
+  'finance','sales-policy','finance-reports','hr','recruitment','training',
+  'employee-records','processes','production','admin-processes','archive','supplier-contracts'
+];
+
 'use strict';
 const crypto=require('node:crypto');
 const {Readable}=require('node:stream');
@@ -97,22 +104,27 @@ function createApi(env=process.env,fetcher=fetch,logger=console){
      db(`documents_index?organization_id=eq.${c.org}&select=*`,{},c.bearer)
     ]);const state=rows[0]?.state;
     if(!state){result={state:null};}else{
-     const output=structuredClone(state),folders=output.folders||[];
-     for(const vf of visible){
-       if(!folders.some(f=>f.id===vf.folder_uid)){
-         folders.push({id:vf.folder_uid,parentId:vf.parent_uid,name:vf.name,description:vf.description||'',kind:'folder',inherit:vf.inherit_permissions!==false,deletedAt:vf.deleted_at||null});
-       }
-     }
-     const ids=new Set(visible.map(f=>f.folder_uid));
-     const ancestors=new Set(['all']),folderById=new Map(folders.map(f=>[f.id,f]));
-     for(const f of folders.filter(f=>ids.has(f.id))){let cursor=f,seen=new Set();while(cursor&&!seen.has(cursor.id)){seen.add(cursor.id);ancestors.add(cursor.id);cursor=folderById.get(cursor.parentId);}}
-     output.folders=folders.filter(f=>ancestors.has(f.id)).map(f=>ids.has(f.id)?f:{id:f.id,parentId:f.parentId,name:f.name,kind:'folder',inherit:false,deletedAt:null});
-     const serverDocIds=new Set(docs.map(d=>d.doc_uid));
-     const deviceDocs=(output.documents||[]).filter(d=>d.assetStorage==='device'&&!serverDocIds.has(d.id));
-     output.documents=[...deviceDocs];
-     for(const d of docs){output.documents.push({id:d.doc_uid,parentId:d.parent_folder_id,name:d.name,description:d.description||'',ext:documentExtension(d.ext,d.mime_type,d.name),bytes:d.bytes,mime:d.mime_type,kind:'file',ownerId:'u1',source:'upload',assetStorage:'server',createdAt:d.created_at,updatedAt:d.updated_at,deletedAt:d.deleted_at||null});}
-     if(!['owner','admin'].includes(c.member.organization_role)){output.logs=[];output.acl=[];output.groups=[];output.users=[{id:'u1',name:c.user.user_metadata?.full_name||c.user.email,email:c.user.email,groupIds:[],active:true}];}
-     output.preferences={...output.preferences,driveSharingEnabled:false};result={state:output,revision:rows[0].revision};
+      const output=structuredClone(state),folders=(output.folders||[]).filter(f=>!DEMO_FOLDER_UIDS.includes(f.id));
+      for(const vf of visible){
+        if(DEMO_FOLDER_UIDS.includes(vf.folder_uid)) continue;
+        if(!folders.some(f=>f.id===vf.folder_uid)){
+          folders.push({id:vf.folder_uid,parentId:vf.parent_uid,name:vf.name,description:vf.description||'',kind:'folder',inherit:vf.inherit_permissions!==false,deletedAt:vf.deleted_at||null});
+        }
+      }
+      const ids=new Set(visible.map(f=>f.folder_uid));
+      const ancestors=new Set(['all']),folderById=new Map(folders.map(f=>[f.id,f]));
+      for(const f of folders.filter(f=>ids.has(f.id))){let cursor=f,seen=new Set();while(cursor&&!seen.has(cursor.id)){seen.add(cursor.id);ancestors.add(cursor.id);cursor=folderById.get(cursor.parentId);}}
+      output.folders=folders.filter(f=>ancestors.has(f.id)).map(f=>ids.has(f.id)?f:{id:f.id,parentId:f.parentId,name:f.name,kind:'folder',inherit:false,deletedAt:null});
+      const serverDocIds=new Set(docs.map(d=>d.doc_uid));
+      const deviceDocs=(output.documents||[]).filter(d=>d.assetStorage==='device'&&!serverDocIds.has(d.id)&&!d.sample&&d.source!=='sample'&&d.source!=='bundled'&&!DEMO_FOLDER_UIDS.includes(d.parentId));
+      output.documents=[...deviceDocs];
+      for(const d of docs){
+        if(DEMO_FOLDER_UIDS.includes(d.parent_folder_id)) continue;
+        output.documents.push({id:d.doc_uid,parentId:d.parent_folder_id,name:d.name,description:d.description||'',ext:documentExtension(d.ext,d.mime_type,d.name),bytes:d.bytes,mime:d.mime_type,kind:'file',ownerId:'u1',source:'upload',assetStorage:'server',createdAt:d.created_at,updatedAt:d.updated_at,deletedAt:d.deleted_at||null});
+      }
+      output.acl=(output.acl||[]).filter(a=>!DEMO_FOLDER_UIDS.includes(a.resourceId));
+      if(!['owner','admin'].includes(c.member.organization_role)){output.logs=[];output.acl=[];output.groups=[];output.users=[{id:'u1',name:c.user.user_metadata?.full_name||c.user.email,email:c.user.email,groupIds:[],active:true}];}
+      output.preferences={...output.preferences,driveSharingEnabled:false};result={state:output,revision:rows[0].revision};
     }
    }else if(action==='document-update'&&req.method==='POST'){
     const input=await body(req),doc=await document(c,input.id,input.trash||input.deletedAt?'delete':'edit');
