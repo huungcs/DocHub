@@ -884,48 +884,128 @@ const DEMO_FOLDER_UIDS = Object.freeze([
       }
       if(!start)throw new Error(startErr?.message||'Không thể khởi tạo phiên tải lên Drive.');
 
-      const chunkSize=start.chunkSize||2*1024*1024;
-      let complete=false,offset=0;
-      while(offset<blob.size){
+      const directUrl=start.uploadUrl;
+      const chunkSize=start.chunkSize||8*1024*1024;
+      let complete=false,driveFileId=null;
+
+      if(directUrl&&typeof directUrl==='string'&&directUrl.startsWith('https://www.googleapis.com/')){
+        let offset=0;
+        while(offset<blob.size){
+          if(signal?.aborted){const err=new Error('Đã hủy tải tệp lên.');err.name='AbortError';throw err;}
+          const end=Math.min(blob.size,offset+chunkSize);
+          const chunk=blob.slice(offset,end);
+          let chunkOk=false,lastErr=null;
+
+          for(let attempt=1;attempt<=5;attempt++){
+            if(signal?.aborted){const err=new Error('Đã hủy tải tệp lên.');err.name='AbortError';throw err;}
+            if(attempt>1){
+              onProgress?.({phase:'retrying',loaded:offset,total:blob.size,percent:Math.round(offset/blob.size*100),attempt});
+              await new Promise(r=>setTimeout(r,Math.min(8000,1000*Math.pow(2,attempt-2))));
+            }
+            try{
+              const chunkResult=await new Promise((resolve,reject)=>{
+                if(signal?.aborted)return reject(new Error('Đã hủy tải tệp lên.'));
+                const xhr=new XMLHttpRequest();
+                const onAbort=()=>xhr.abort();
+                xhr.open('PUT',directUrl);
+                xhr.setRequestHeader('Content-Type',blob.type||'application/octet-stream');
+                xhr.setRequestHeader('Content-Range',`bytes ${offset}-${end-1}/${blob.size}`);
+                xhr.upload.onprogress=event=>{
+                  const currentLoaded=Math.min(blob.size,offset+(event.loaded||0));
+                  onProgress?.({phase:'uploading',loaded:currentLoaded,total:blob.size,percent:Math.round(currentLoaded/blob.size*100)});
+                };
+                xhr.onload=()=>{
+                  signal?.removeEventListener('abort',onAbort);
+                  if(xhr.status===200||xhr.status===201){
+                    try{resolve({complete:true,data:JSON.parse(xhr.responseText)});}catch(_){reject(new Error('Google Drive trả về dữ liệu không hợp lệ.'));}
+                  }else if(xhr.status===308){
+                    resolve({complete:false,range:xhr.getResponseHeader('Range')});
+                  }else{
+                    let msg=`Lỗi Drive (${xhr.status})`;try{msg=JSON.parse(xhr.responseText).error?.message||msg;}catch(_){}
+                    const err=new Error(msg);err.status=xhr.status;reject(err);
+                  }
+                };
+                xhr.onerror=()=>{signal?.removeEventListener('abort',onAbort);reject(new Error('Mất kết nối mạng khi đang truyền tệp lên Drive.'));};
+                xhr.onabort=()=>{signal?.removeEventListener('abort',onAbort);const err=new Error('Đã hủy tải tệp lên.');err.name='AbortError';reject(err);};
+                signal?.addEventListener('abort',onAbort,{once:true});
+                xhr.send(chunk);
+              });
+
+              if(chunkResult.complete){
+                complete=true;driveFileId=chunkResult.data?.id;offset=blob.size;chunkOk=true;break;
+              }
+              if(chunkResult.range){
+                const m=/bytes=(\d+)-(\d+)/.exec(chunkResult.range);
+                if(m&&Number(m[2])+1>offset){offset=Number(m[2])+1;chunkOk=true;break;}
+              }
+              offset=end;chunkOk=true;break;
+            }catch(chunkErr){
+              if(chunkErr?.name==='AbortError')throw chunkErr;
+              lastErr=chunkErr;
+              console.warn(`DocHub: Tải khối Drive (${offset}-${end}) lần ${attempt}:`,chunkErr?.message||chunkErr);
+              try{
+                const statusXhr=await new Promise((res,rej)=>{const x=new XMLHttpRequest();x.open('PUT',directUrl);x.setRequestHeader('Content-Range',`bytes */${blob.size}`);x.onload=()=>res(x);x.onerror=rej;x.send();});
+                if(statusXhr.status===308){
+                  const r=statusXhr.getResponseHeader('Range'),m=/bytes=(\d+)-(\d+)/.exec(r||'');
+                  if(m&&Number(m[2])+1>offset){offset=Number(m[2])+1;chunkOk=true;break;}
+                }else if(statusXhr.status===200||statusXhr.status===201){
+                  const d=JSON.parse(statusXhr.responseText);complete=true;driveFileId=d.id;offset=blob.size;chunkOk=true;break;
+                }
+              }catch(_){}
+            }
+          }
+          if(!chunkOk){
+            const msg=lastErr?.message&&!/Failed to fetch/i.test(lastErr.message)?lastErr.message:'Mất kết nối mạng khi đang tải lên. Vui lòng kiểm tra đường truyền và thử lại.';
+            throw new Error(msg);
+          }
+        }
+
+        if(complete&&driveFileId){
+          await backend('upload-finish',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({upload:start.id,driveFileId}),signal});
+          onProgress?.({phase:'uploading',loaded:blob.size,total:blob.size,percent:100});
+          return {driveStored:true,cached:false};
+        }
+      }
+
+      let proxyOffset=0;
+      const proxyChunkSize=2*1024*1024;
+      while(proxyOffset<blob.size){
         if(signal?.aborted){const err=new Error('Đã hủy tải tệp lên.');err.name='AbortError';throw err;}
-        const end=Math.min(blob.size,offset+chunkSize);
+        const end=Math.min(blob.size,proxyOffset+proxyChunkSize);
         let chunkOk=false,lastErr=null;
 
         for(let attempt=1;attempt<=5;attempt++){
           if(signal?.aborted){const err=new Error('Đã hủy tải tệp lên.');err.name='AbortError';throw err;}
           if(attempt>1){
-            onProgress?.({phase:'retrying',loaded:offset,total:blob.size,percent:Math.round((offset/blob.size)*100),attempt});
+            onProgress?.({phase:'retrying',loaded:proxyOffset,total:blob.size,percent:Math.round((proxyOffset/blob.size)*100),attempt});
             const backoff=Math.min(8000,800*Math.pow(2,attempt-2));
             await new Promise(r=>setTimeout(r,backoff));
           }
           try{
-            onProgress?.({phase:'uploading',loaded:offset,total:blob.size,percent:Math.round((offset/blob.size)*100)});
-            const resp=await backend('upload-chunk&upload='+encodeURIComponent(start.id),{method:'PUT',headers:{'Content-Type':'application/octet-stream','Content-Range':`bytes ${offset}-${end-1}/${blob.size}`},body:blob.slice(offset,end),signal});
+            onProgress?.({phase:'uploading',loaded:proxyOffset,total:blob.size,percent:Math.round((proxyOffset/blob.size)*100)});
+            const resp=await backend('upload-chunk&upload='+encodeURIComponent(start.id),{method:'PUT',headers:{'Content-Type':'application/octet-stream','Content-Range':`bytes ${proxyOffset}-${end-1}/${blob.size}`},body:blob.slice(proxyOffset,end),signal});
             const result=await resp.json();
             complete=result.complete===true;
             if(complete){
-              offset=blob.size;chunkOk=true;
+              proxyOffset=blob.size;chunkOk=true;
               onProgress?.({phase:'uploading',loaded:blob.size,total:blob.size,percent:100});
               break;
             }
             if(result.range){
               const m=/bytes=(\d+)-(\d+)/.exec(result.range);
-              if(m){
-                const verifiedNext=Number(m[2])+1;
-                if(verifiedNext>offset){
-                  offset=verifiedNext;chunkOk=true;
-                  onProgress?.({phase:'uploading',loaded:offset,total:blob.size,percent:Math.round((offset/blob.size)*100)});
-                  break;
-                }
+              if(m&&Number(m[2])+1>proxyOffset){
+                proxyOffset=Number(m[2])+1;chunkOk=true;
+                onProgress?.({phase:'uploading',loaded:proxyOffset,total:blob.size,percent:Math.round((proxyOffset/blob.size)*100)});
+                break;
               }
             }
-            offset=end;chunkOk=true;
-            onProgress?.({phase:'uploading',loaded:offset,total:blob.size,percent:Math.round((offset/blob.size)*100)});
+            proxyOffset=end;chunkOk=true;
+            onProgress?.({phase:'uploading',loaded:proxyOffset,total:blob.size,percent:Math.round((proxyOffset/blob.size)*100)});
             break;
           }catch(err){
             if(err?.name==='AbortError')throw err;
             lastErr=err;
-            console.warn(`DocHub: Tải khối ${offset}-${end} gặp sự cố (lần ${attempt}/5):`,err.message||err);
+            console.warn(`DocHub: Tải khối ${proxyOffset}-${end} gặp sự cố (lần ${attempt}/5):`,err.message||err);
           }
         }
 

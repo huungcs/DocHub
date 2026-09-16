@@ -176,16 +176,27 @@ function createApi(env=process.env,fetcher=fetch,logger=console){
     const response=await fetcher('https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable&fields=id',{method:'POST',headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json','X-Upload-Content-Length':String(input.bytes),'X-Upload-Content-Type':mime},body:JSON.stringify({name:input.name,mimeType:mime,parents:[driveFolderId]}),signal:AbortSignal.timeout(30000)});
     if(!response.ok)throw fail(502,'Không tạo được phiên tải vào kho Drive.');
     const location=response.headers.get('location');if(!location||new URL(location).hostname!=='www.googleapis.com')throw fail(502,'Phiên tải Drive không hợp lệ.');
-    const id=crypto.randomUUID();await db('organization_uploads',{method:'POST',body:JSON.stringify({id,organization_id:c.org,user_id:c.user.id,doc_uid:input.id,folder_uid:input.folder,name:input.name,ext:documentExtension(input.ext,mime,input.name),mime,bytes:input.bytes,encrypted_url:seal(location,key,id)})});result={id,chunkSize:2*1024*1024};
+    const id=crypto.randomUUID();await db('organization_uploads',{method:'POST',body:JSON.stringify({id,organization_id:c.org,user_id:c.user.id,doc_uid:input.id,folder_uid:input.folder,name:input.name,ext:documentExtension(input.ext,mime,input.name),mime,bytes:input.bytes,encrypted_url:seal(location,key,id)})});result={id,uploadUrl:location,chunkSize:8*1024*1024};
+   }else if(action==='upload-finish'&&req.method==='POST'){
+    const input=await body(req);
+    const id=input.upload;if(!/^[0-9a-f-]{36}$/i.test(id||''))throw fail(400,'Phiên tải không hợp lệ.');
+    const sessions=await db(`organization_uploads?id=eq.${id}&organization_id=eq.${c.org}&user_id=eq.${c.user.id}&select=*`),s=sessions[0];
+    if(!s)throw fail(404,'Phiên tải không tồn tại hoặc đã hoàn tất.');
+    const driveFileId=input.driveFileId;
+    if(!driveFileId||typeof driveFileId!=='string'||driveFileId.length>200)throw fail(400,'Mã tệp Drive không hợp lệ.');
+    const token=await ownerToken(c);
+    const meta=await jsonFetch(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(driveFileId)}?fields=id,name,size,trashed`,{headers:{Authorization:`Bearer ${token}`}});
+    if(!meta||meta.id!==driveFileId||meta.trashed)throw fail(404,'Không tìm thấy tệp trên Google Drive.');
+    await db('documents_index?on_conflict=user_id,doc_uid',{method:'POST',headers:{Prefer:'resolution=merge-duplicates,return=representation'},body:JSON.stringify({organization_id:c.org,user_id:c.user.id,doc_uid:s.doc_uid,parent_folder_id:s.folder_uid,name:s.name.replace(new RegExp('\\.'+s.ext.replace(/[^a-z0-9]/gi,'')+'$','i'),''),ext:s.ext,bytes:Number(meta.size)||s.bytes,mime_type:s.mime,google_drive_file_id:driveFileId})});
+    await db(`organization_uploads?id=eq.${id}`,{method:'DELETE'});result={complete:true,id:driveFileId};
    }else if(action==='upload-chunk'&&req.method==='PUT'){
     const id=url.searchParams.get('upload');if(!/^[0-9a-f-]{36}$/i.test(id||''))throw fail(400,'Phiên tải không hợp lệ.');
     const sessions=await db(`organization_uploads?id=eq.${id}&organization_id=eq.${c.org}&user_id=eq.${c.user.id}&select=*`),s=sessions[0];
     if(!s||Date.parse(s.expires_at)<Date.now())throw fail(410,'Phiên tải đã hết hạn.');
-    await allowed(c,s.folder_uid,'create');
     const parts=/^bytes (\d+)-(\d+)\/(\d+)$/.exec(req.headers['content-range']||'');
     if(!parts||Number(parts[3])!==Number(s.bytes)||Number(parts[2])>=Number(s.bytes)||Number(parts[2])<Number(parts[1])||Number(parts[1])%262144!==0)throw fail(400,'Khoảng tải không hợp lệ.');
-    let payload;if(Buffer.isBuffer(req.body))payload=req.body;else if(typeof req.body==='string')payload=Buffer.from(req.body,req.body.includes('\u0000')?'binary':'utf8');else{const chunks=[];let size=0;for await(const chunk of req){size+=chunk.length;if(size>4*1024*1024)throw fail(413,'Khối tải vượt giới hạn.');chunks.push(chunk);}payload=Buffer.concat(chunks);}
-    if(payload.length>4*1024*1024||payload.length!==Number(parts[2])-Number(parts[1])+1)throw fail(400,'Kích thước khối tải không hợp lệ.');
+    let payload;if(Buffer.isBuffer(req.body))payload=req.body;else if(typeof req.body==='string')payload=Buffer.from(req.body,'latin1');else{const chunks=[];let size=0;for await(const chunk of req){size+=chunk.length;if(size>10*1024*1024)throw fail(413,'Khối tải vượt giới hạn.');chunks.push(chunk);}payload=Buffer.concat(chunks);}
+    if(payload.length>10*1024*1024||payload.length!==Number(parts[2])-Number(parts[1])+1)throw fail(400,'Kích thước khối tải không hợp lệ.');
     const token=await ownerToken(c),uploadUrl=unseal(s.encrypted_url,key,id);
     const response=await fetcher(uploadUrl,{method:'PUT',headers:{Authorization:`Bearer ${token}`,'Content-Type':s.mime,'Content-Range':req.headers['content-range']},body:payload,signal:AbortSignal.timeout(60000)});
     if(response.status===308){result={complete:false,range:response.headers.get('range')};}

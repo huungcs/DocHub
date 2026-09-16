@@ -92,3 +92,37 @@ test('Denied folder reads never obtain the owner token or fetch bytes',async()=>
  const res=response();await api(request('/api/organization?action=asset&organization='+org+'&id=doc-1',{authorization:'Bearer jwt'}),res);
  assert.equal(res.statusCode,403);assert.ok(!urls.some(u=>u.includes('connections')||u.includes('googleapis')));
 });
+test('upload-start returns direct uploadUrl and upload-finish verifies and indexes file',async()=>{
+ const createdDocs=[];const deletedUploads=[];
+ const api=createApi({SUPABASE_URL:'https://test',SUPABASE_SERVICE_ROLE_KEY:'service',GOOGLE_OAUTH_CLIENT_ID:'id',GOOGLE_OAUTH_CLIENT_SECRET:'sec'},async(url,opts={})=>{
+  if(url.includes('/auth/v1/user'))return {ok:true,status:200,json:async()=>({id:'owner'})};
+  if(url.includes('organization_members'))return {ok:true,status:200,json:async()=>([{organization_role:'owner'}])};
+  if(url.includes('/organizations?'))return {ok:true,status:200,json:async()=>([{owner_id:'owner'}])};
+  if(url.includes('rpc/dochub_can_folder_action'))return {ok:true,status:200,json:async()=>true};
+  if(url.includes('documents_index?organization_id='))return {ok:true,status:200,json:async()=>[]};
+  if(url.includes('organization_drive_folders'))return {ok:true,status:200,json:async()=>([{drive_folder_id:'drive-folder'}])};
+  if(url.includes('organization_drive_connections'))return {ok:true,status:200,json:async()=>([{owner_id:'owner',encrypted_refresh_token:seal('rt','service',org)}])};
+  if(url.includes('oauth2.googleapis.com/token'))return {ok:true,status:200,json:async()=>({access_token:'drive-token',expires_in:3600})};
+  if(url.includes('upload/drive/v3/files?uploadType=resumable'))return {ok:true,status:200,headers:new Map([['location','https://www.googleapis.com/upload/session-123']])};
+  if(url.includes('organization_uploads?id=eq.')&&opts.method==='DELETE'){deletedUploads.push('11111111-1111-1111-1111-111111111111');return {ok:true,status:200,json:async()=>[]};}
+  if(url.includes('organization_uploads?id=eq.'))return {ok:true,status:200,json:async()=>([{id:'11111111-1111-1111-1111-111111111111',organization_id:org,user_id:'owner',doc_uid:'doc-1',folder_uid:'all',name:'test.pdf',ext:'pdf',bytes:1024,mime:'application/pdf'}])};
+  if(url.includes('googleapis.com/drive/v3/files/drive-file-123'))return {ok:true,status:200,json:async()=>({id:'drive-file-123',name:'test.pdf',size:1024,trashed:false})};
+  if(url.includes('documents_index?on_conflict=')){createdDocs.push(JSON.parse(opts.body));return {ok:true,status:200,json:async()=>[{id:1}]};}
+  if(url.includes('organization_uploads')){return {ok:true,status:200,json:async()=>[]};}
+  throw Error('Unexpected url: '+url);
+ });
+ const startReq=request('/api/organization?action=upload-start&organization='+org,{authorization:'Bearer jwt','content-type':'application/json'},'POST',JSON.stringify({id:'doc-1',folder:'all',name:'test.pdf',ext:'pdf',mime:'application/pdf',bytes:1024}));
+ const startRes=response();
+ await api(startReq,startRes);
+ assert.equal(startRes.data.uploadUrl,'https://www.googleapis.com/upload/session-123');
+ assert.equal(startRes.data.chunkSize,8*1024*1024);
+
+ const finishReq=request('/api/organization?action=upload-finish&organization='+org,{authorization:'Bearer jwt','content-type':'application/json'},'POST',JSON.stringify({upload:'11111111-1111-1111-1111-111111111111',driveFileId:'drive-file-123'}));
+ const finishRes=response();
+ await api(finishReq,finishRes);
+ assert.equal(finishRes.data.complete,true);
+ assert.equal(createdDocs.length,1);
+ assert.equal(createdDocs[0].google_drive_file_id,'drive-file-123');
+ assert.equal(deletedUploads.length,1);
+});
+
