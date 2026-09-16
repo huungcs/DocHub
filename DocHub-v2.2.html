@@ -3388,25 +3388,28 @@ function openHelp() {
         await requirePermission('all','manage');
         const name=cleanName(data.get('name')),email=String(data.get('email')||'').trim().toLowerCase();
         if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))throw new Error('Email chưa đúng định dạng.');
-        if(state.users.some(person=>person.id!==id&&person.email.toLowerCase()===email))throw new Error('Email này đã có trong danh sách.');
+        const existingPerson=state.users.find(person=>person.email.toLowerCase()===email);
+        if(existingPerson&&id&&existingPerson.id!==id)throw new Error('Email này đã được dùng bởi thành viên khác.');
+        const memberId=id||(existingPerson?existingPerson.id:uid('user'));
         const groupIds=data.getAll('groupIds').map(String).filter(groupId=>state.groups.some(group=>group.id===groupId));
-        if(id==='u1'&&!groupIds.includes('g-system'))throw new Error('Giữ tài khoản quản trị mẫu trong nhóm Quản trị hệ thống.');
+        if((memberId==='u1'||id==='u1')&&!groupIds.includes('g-system'))throw new Error('Giữ tài khoản quản trị mẫu trong nhóm Quản trị hệ thống.');
         const fields={name,email,department:String(data.get('department')||'').trim(),groupIds,active:id==='u1'||data.has('active')};
         const quickRole=String(data.get('quickRole')||'keep'),quickScope=String(data.get('quickScope')||'');
         if(quickRole!=='keep'){
           if(!['viewer','contributor','editor','manager'].includes(quickRole))throw new Error('Vai trò không hợp lệ.');
           if(!active(folder(quickScope)))throw new Error('Chọn thư mục được phép truy cập.');
           await requirePermission(quickScope,'manage');
-        }else if(!id)throw new Error('Chọn vai trò cho nhân sự mới.');
-        const memberId=id||uid('user');
-        if(id)Object.assign(user(id),fields);else state.users.push({id:memberId,...fields});
+        }else if(!id&&!existingPerson)throw new Error('Chọn vai trò cho nhân sự mới.');
+        if(existingPerson)Object.assign(existingPerson,fields);
+        else if(id)Object.assign(user(id),fields);
+        else state.users.push({id:memberId,...fields});
         if(quickRole!=='keep'){
           const existing=state.acl.find(rule=>rule.resourceId===quickScope&&rule.principalType==='user'&&rule.principalId===memberId);
           if(existing)existing.role=quickRole;
           else state.acl.push({id:uid('acl'),resourceId:quickScope,principalType:'user',principalId:memberId,role:quickRole});
         }
-        commit(id?'Cập nhật thành viên':'Mời thành viên','all',`${name} · ${email}. Thành viên nhóm được cập nhật.`,'user');
-        toast('Đã lưu thành viên và đồng bộ quyền lên máy chủ.');
+        commit(id||existingPerson?'Cập nhật thành viên':'Mời thành viên','all',`${name} · ${email}. Thành viên nhóm được cập nhật.`,'user');
+        toast(existingPerson&&!id?'Đã cập nhật thông tin và đồng bộ quyền lên máy chủ.':'Đã lưu thành viên và đồng bộ quyền lên máy chủ.');
       } else if(kind==='group') {
         await requirePermission('all','manage');
         const name=cleanName(data.get('name'));

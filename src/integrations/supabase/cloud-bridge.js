@@ -433,9 +433,56 @@
     }
 
     workspaceLoadStatus = 'loading';
+    async function syncMembersFromDatabase(targetState) {
+      if (!targetState) return;
+      if (!organization) await ensureOrganization();
+      if (!organization || !['owner', 'admin'].includes(organization.role)) return;
+      try {
+        const { data: members } = await supabase.from('organization_members').select('*').eq('organization_id', organization.id);
+        if (Array.isArray(members) && members.length) {
+          const memberMap = new Map(members.map(m => [m.app_user_uid, m]));
+          const emailMap = new Map(members.map(m => [m.email.toLowerCase(), m]));
+          const updatedUsers = [];
+          for (const u of (targetState.users || [])) {
+            const dbM = memberMap.get(u.id) || emailMap.get(u.email?.toLowerCase());
+            if (dbM) {
+              updatedUsers.push({
+                id: dbM.app_user_uid,
+                name: dbM.display_name || u.name,
+                email: dbM.email,
+                department: dbM.department || u.department || '',
+                active: dbM.status === 'active',
+                groupIds: u.groupIds || []
+              });
+              memberMap.delete(dbM.app_user_uid);
+              emailMap.delete(dbM.email.toLowerCase());
+            } else {
+              updatedUsers.push(u);
+            }
+          }
+          for (const dbM of memberMap.values()) {
+            if (!updatedUsers.some(u => u.id === dbM.app_user_uid || u.email.toLowerCase() === dbM.email.toLowerCase())) {
+              updatedUsers.push({
+                id: dbM.app_user_uid,
+                name: dbM.display_name,
+                email: dbM.email,
+                department: dbM.department || '',
+                active: dbM.status === 'active',
+                groupIds: []
+              });
+            }
+          }
+          targetState.users = updatedUsers;
+        }
+      } catch (_) {}
+    }
+
     if(organizationBackend){
       try{
         const result=await (await backend('workspace')).json();
+        if(result.state){
+          await syncMembersFromDatabase(result.state);
+        }
         loadedSharedState=result.state;
         revision=result.revision||1;
         workspaceLoadStatus=result.state?'loaded':'not_found';
@@ -463,6 +510,7 @@
       }
 
       if (data && data.state) {
+        await syncMembersFromDatabase(data.state);
         driveSharingEnabled = data.state.preferences?.driveSharingEnabled === true;
         workspaceLoadStatus = 'loaded';
         revision = data.revision || 1;
