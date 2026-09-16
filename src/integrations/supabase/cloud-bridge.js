@@ -242,34 +242,52 @@
       clearTimeout(timeout);
     }
   }
+  function handleDriveAuthError(err) {
+    if (err?.status === 401 || /invalid authentication credentials|hết hạn/i.test(err?.message || '')) {
+      providerToken = null;
+      connectedDriveToken = null;
+      googleDriveFolderId = null;
+      try {
+        sessionStorage.removeItem('dochub_google_token');
+        sessionStorage.removeItem('dochub_google_token_time');
+      } catch(_) {}
+      authError = 'Phiên kết nối Google Drive đã hết hạn. Mở menu tài khoản → Kết nối lại Google Drive.';
+      emitAuth('DRIVE_TOKEN_EXPIRED');
+    }
+  }
   let folderMirrorQueue=Promise.resolve();
   function mirrorDriveFolders() {
     const task=folderMirrorQueue.catch(()=>{}).then(async()=>{
       if(organization?.role!=='owner')throw new Error('Kho Drive tổ chức phải được kết nối bởi chủ sở hữu.');
       if(!providerToken)throw new Error('Cần kết nối lại Google Drive.');
-      const checked=result=>{if(result.error)throw result.error;return result.data||[];};
-      const folders=checked(await supabase.from('organization_folders').select('folder_uid,parent_uid,name,deleted_at').eq('organization_id',organization.id));
-      const maps=checked(await supabase.from('organization_drive_folders').select('folder_uid,drive_folder_id').eq('organization_id',organization.id));
-      const ids=new Map(maps.map(row=>[row.folder_uid,row.drive_folder_id])),done=new Set(),visiting=new Set();
-      async function ensure(uid){
-        if(done.has(uid))return ids.get(uid);
-        if(visiting.has(uid))throw new Error('Cây thư mục có vòng lặp.');
-        const folder=folders.find(f=>f.folder_uid===uid&&!f.deleted_at);
-        if(!folder)throw new Error('Không tìm thấy thư mục tổ chức: '+uid);
-        visiting.add(uid);
-        const parent=folder.parent_uid?await ensure(folder.parent_uid):null;
-        const name=uid==='all'?`DocHub — ${currentUser.user_metadata?.full_name||currentUser.email}`:folder.name;
-        let id=ids.get(uid);
-        if(!id){
-          const result=await window.DocHubDrive.getOrCreateMirroredFolder(providerToken,organization.id,uid,name,parent);
-          id=result.id;
-          checked(await supabase.from('organization_drive_folders').upsert({organization_id:organization.id,folder_uid:uid,drive_folder_id:id}));ids.set(uid,id);
+      try {
+        const checked=result=>{if(result.error)throw result.error;return result.data||[];};
+        const folders=checked(await supabase.from('organization_folders').select('folder_uid,parent_uid,name,deleted_at').eq('organization_id',organization.id));
+        const maps=checked(await supabase.from('organization_drive_folders').select('folder_uid,drive_folder_id').eq('organization_id',organization.id));
+        const ids=new Map(maps.map(row=>[row.folder_uid,row.drive_folder_id])),done=new Set(),visiting=new Set();
+        async function ensure(uid){
+          if(done.has(uid))return ids.get(uid);
+          if(visiting.has(uid))throw new Error('Cây thư mục có vòng lặp.');
+          const folder=folders.find(f=>f.folder_uid===uid&&!f.deleted_at);
+          if(!folder)throw new Error('Không tìm thấy thư mục tổ chức: '+uid);
+          visiting.add(uid);
+          const parent=folder.parent_uid?await ensure(folder.parent_uid):null;
+          const name=uid==='all'?`DocHub — ${currentUser.user_metadata?.full_name||currentUser.email}`:folder.name;
+          let id=ids.get(uid);
+          if(!id){
+            const result=await window.DocHubDrive.getOrCreateMirroredFolder(providerToken,organization.id,uid,name,parent);
+            id=result.id;
+            checked(await supabase.from('organization_drive_folders').upsert({organization_id:organization.id,folder_uid:uid,drive_folder_id:id}));ids.set(uid,id);
+          }
+          await window.DocHubDrive.reconcileFolder(providerToken,id,name,parent);
+          visiting.delete(uid);done.add(uid);return id;
         }
-        await window.DocHubDrive.reconcileFolder(providerToken,id,name,parent);
-        visiting.delete(uid);done.add(uid);return id;
+        for(const folder of folders.filter(f=>!f.deleted_at))await ensure(folder.folder_uid);
+        googleDriveFolderId=ids.get('all');return ids;
+      } catch (mirrorErr) {
+        handleDriveAuthError(mirrorErr);
+        throw mirrorErr;
       }
-      for(const folder of folders.filter(f=>!f.deleted_at))await ensure(folder.folder_uid);
-      googleDriveFolderId=ids.get('all');return ids;
     });
     folderMirrorQueue=task;return task;
   }
@@ -318,13 +336,30 @@
       connectedDriveToken = null;
       organizationBackend=false;loadedSharedState=null;
       sessionStorage.removeItem('dochub_google_token');
+      sessionStorage.removeItem('dochub_google_token_time');
       authStatus = googleProviderEnabled === false ? 'configuration_required' : 'signed_out';
       emitAuth(event);
       return false;
     }
 
-    providerToken = session.provider_token || sessionStorage.getItem('dochub_google_token') || null;
-    if (session.provider_token) sessionStorage.setItem('dochub_google_token', session.provider_token);
+    let storedToken = null;
+    try {
+      const raw = sessionStorage.getItem('dochub_google_token');
+      const time = Number(sessionStorage.getItem('dochub_google_token_time') || 0);
+      if (raw && time && (Date.now() - time < 50 * 60 * 1000)) {
+        storedToken = raw;
+      } else if (raw) {
+        sessionStorage.removeItem('dochub_google_token');
+        sessionStorage.removeItem('dochub_google_token_time');
+      }
+    } catch(_) {}
+    providerToken = session.provider_token || storedToken || null;
+    if (session.provider_token) {
+      try {
+        sessionStorage.setItem('dochub_google_token', session.provider_token);
+        sessionStorage.setItem('dochub_google_token_time', String(Date.now()));
+      } catch(_) {}
+    }
     authStatus = providerToken ? 'connecting_drive' : 'authenticated';
     emitAuth(event);
 
@@ -676,9 +711,15 @@
         if (error) throw error;
         revision = nextRevision;
         loadedSharedState=structuredClone(snapshot);
-        if(organization?.role==='owner'&&providerToken)await mirrorDriveFolders();
+        if(organization?.role==='owner'&&providerToken){
+          try{await mirrorDriveFolders();}
+          catch(mirrorErr){console.warn('DocHub: mirrorDriveFolders background sync:', mirrorErr.message);}
+        }
         driveSharingEnabled = snapshot.preferences?.driveSharingEnabled === true;
-        if (!organizationBackend && driveSharingEnabled && organization && ['owner','admin'].includes(organization.role)) await api.syncDrivePermissions();
+        if (!organizationBackend && driveSharingEnabled && organization && ['owner','admin'].includes(organization.role)) {
+          try{await api.syncDrivePermissions();}
+          catch(permErr){console.warn('DocHub: syncDrivePermissions background sync:', permErr.message);}
+        }
         document.dispatchEvent(new CustomEvent('dochub:sync', { detail: { ok: true } }));
       } catch (err) {
         console.error('Lỗi lưu dữ liệu lên Supabase:', err);
@@ -784,6 +825,7 @@
           catch(error){document.dispatchEvent(new CustomEvent('dochub:sync',{detail:{ok:false,error:'Tệp đã lên Drive nhưng chưa đồng bộ quyền: '+error.message}}));}
         }
       } catch (driveErr) {
+        handleDriveAuthError(driveErr);
         if (driveErr?.name === 'AbortError') {
           await cacheDelete('assets', userCacheKey(id));
           throw driveErr;
@@ -805,30 +847,35 @@
   api.syncDrivePermissions = async (fileId=null,folderUid=null) => {
     if(!organization || !['owner','admin'].includes(organization.role))return;
     if(!providerToken)throw new Error('Đăng nhập lại Google để đồng bộ quyền Drive.');
-    const checked=result=>{if(result.error)throw result.error;return result.data||[];};
-    const files=fileId?[{google_drive_file_id:fileId,parent_folder_id:folderUid}]:checked(await supabase.from('documents_index').select('google_drive_file_id,parent_folder_id').eq('organization_id',organization.id).eq('user_id',currentUser.id).not('google_drive_file_id','is',null));
-    for(const file of files){
-      const driveId=file.google_drive_file_id;
-      const desired=checked(await supabase.rpc('dochub_drive_recipients',{p_organization_id:organization.id,p_folder_uid:file.parent_folder_id}));
-      const grants=checked(await supabase.from('drive_permission_links').select('*').eq('organization_id',organization.id).eq('drive_file_id',driveId));
-      const live=await window.DocHubDrive.listPermissions(providerToken,driveId);
-      const base=()=>supabase.from('drive_permission_links');
-      for(const recipient of desired){
-        if(recipient.email.toLowerCase()===currentUser.email?.toLowerCase())continue;
-        const grant=grants.find(g=>g.email===recipient.email);
-        const existing=live.find(p=>p.type==='user'&&p.emailAddress?.toLowerCase()===recipient.email);
-        if(existing?.role==='owner')continue;
-        if(existing&&!grant)throw new Error('Tệp có quyền Drive cấp ngoài DocHub cho '+recipient.email+'. Cần đối soát trước khi đồng bộ.');
-        if(existing&&grant&&existing.id!==grant.permission_id)throw new Error('Quyền Drive đã thay đổi ngoài DocHub. Cần đối soát trước khi cập nhật.');
-        const permission=await window.DocHubDrive.setUserPermission(providerToken,driveId,recipient.email,recipient.role,existing?.id||null);
-        checked(await base().upsert({organization_id:organization.id,drive_file_id:driveId,email:recipient.email,permission_id:permission.id,role:recipient.role}));
+    try {
+      const checked=result=>{if(result.error)throw result.error;return result.data||[];};
+      const files=fileId?[{google_drive_file_id:fileId,parent_folder_id:folderUid}]:checked(await supabase.from('documents_index').select('google_drive_file_id,parent_folder_id').eq('organization_id',organization.id).eq('user_id',currentUser.id).not('google_drive_file_id','is',null));
+      for(const file of files){
+        const driveId=file.google_drive_file_id;
+        const desired=checked(await supabase.rpc('dochub_drive_recipients',{p_organization_id:organization.id,p_folder_uid:file.parent_folder_id}));
+        const grants=checked(await supabase.from('drive_permission_links').select('*').eq('organization_id',organization.id).eq('drive_file_id',driveId));
+        const live=await window.DocHubDrive.listPermissions(providerToken,driveId);
+        const base=()=>supabase.from('drive_permission_links');
+        for(const recipient of desired){
+          if(recipient.email.toLowerCase()===currentUser.email?.toLowerCase())continue;
+          const grant=grants.find(g=>g.email===recipient.email);
+          const existing=live.find(p=>p.type==='user'&&p.emailAddress?.toLowerCase()===recipient.email);
+          if(existing?.role==='owner')continue;
+          if(existing&&!grant)throw new Error('Tệp có quyền Drive cấp ngoài DocHub cho '+recipient.email+'. Cần đối soát trước khi đồng bộ.');
+          if(existing&&grant&&existing.id!==grant.permission_id)throw new Error('Quyền Drive đã thay đổi ngoài DocHub. Cần đối soát trước khi cập nhật.');
+          const permission=await window.DocHubDrive.setUserPermission(providerToken,driveId,recipient.email,recipient.role,existing?.id||null);
+          checked(await base().upsert({organization_id:organization.id,drive_file_id:driveId,email:recipient.email,permission_id:permission.id,role:recipient.role}));
+        }
+        for(const grant of grants){
+          if(desired.some(r=>r.email===grant.email))continue;
+          const existing=live.find(p=>p.id===grant.permission_id);
+          if(existing && existing.role!=='owner')await window.DocHubDrive.removePermission(providerToken,driveId,grant.permission_id);
+          checked(await base().delete().eq('organization_id',organization.id).eq('drive_file_id',driveId).eq('email',grant.email));
+        }
       }
-      for(const grant of grants){
-        if(desired.some(r=>r.email===grant.email))continue;
-        const existing=live.find(p=>p.id===grant.permission_id);
-        if(existing && existing.role!=='owner')await window.DocHubDrive.removePermission(providerToken,driveId,grant.permission_id);
-        checked(await base().delete().eq('organization_id',organization.id).eq('drive_file_id',driveId).eq('email',grant.email));
-      }
+    } catch (syncErr) {
+      handleDriveAuthError(syncErr);
+      throw syncErr;
     }
   };
   api.getAsset = async (id, parentFolderId = 'all') => {
@@ -857,6 +904,7 @@
             return blob;
           }
         } catch (e) {
+          handleDriveAuthError(e);
           console.warn('Tải tệp từ Google Drive thất bại:', e);
         }
       }
@@ -913,8 +961,13 @@
     if (providerToken && window.DocHubDrive) {
       const meta = await cacheGet('meta', userCacheKey(id));
       if (meta?.driveId) {
-        await window.DocHubDrive.deleteFile(providerToken, meta.driveId);
-        await cacheDelete('meta', userCacheKey(id));
+        try {
+          await window.DocHubDrive.deleteFile(providerToken, meta.driveId);
+          await cacheDelete('meta', userCacheKey(id));
+        } catch (driveErr) {
+          handleDriveAuthError(driveErr);
+          console.warn('Xóa tệp trên Drive thất bại:', driveErr);
+        }
       }
     }
     if (currentUser && supabase) {

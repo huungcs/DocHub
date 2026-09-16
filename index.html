@@ -2976,6 +2976,10 @@ window.DocHubMedia={init,open,typeOf,getSession:()=>session};
   }
   const toastActions=new Map();
   function toast(message,type='success',actionLabel='',callback=null) {
+    if (typeof message === 'string' && /invalid authentication credentials/i.test(message)) {
+      message = 'Phiên kết nối Google Drive đã hết hạn. Vui lòng mở menu tài khoản → Kết nối lại Google Drive.';
+      type = 'warning';
+    }
     const id=uid('toast'),host=$('#toasts');
     const toastEl=document.createElement('div');
     toastEl.className=`toast ${type}`;toastEl.id=id;
@@ -3851,7 +3855,15 @@ function openHelp() {
       if(duplicateName(name,item.parentId,[id]))throw new Error('Tên đã tồn tại trong thư mục.');
       item.name=name;item.description=description.slice(0,1000);item.updatedAt=new Date().toISOString();commit('Cập nhật thông tin tài liệu',id,name);await window.DocHubAPI?.flush();}
   });
-  document.addEventListener('dochub:sync',event=>{if(!event.detail.ok)toast(event.detail.error||'Chưa đồng bộ được máy chủ.','warning');});
+  document.addEventListener('dochub:sync',event=>{
+    if(!event.detail.ok) {
+      let msg = event.detail.error || 'Chưa đồng bộ được máy chủ.';
+      if (/invalid authentication credentials/i.test(msg)) {
+        msg = 'Phiên kết nối Google Drive đã hết hạn. Mở menu tài khoản → Kết nối lại Google Drive.';
+      }
+      toast(msg, 'warning');
+    }
+  });
   // Narrow adapter for the responsive layer. Existing data / storage keys remain intact.
   window.DocHubMobileBridge=Object.freeze({
     context:()=>({folderId:ui.folder,parentId:folder(ui.folder)?.parentId,name:folder(ui.folder)?.name||'',

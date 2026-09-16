@@ -23,6 +23,9 @@ window.DocHubDrive = (() => {
         const errJson = await res.json();
         if (errJson.error?.message) msg = errJson.error.message;
       } catch (_) {}
+      if (res.status === 401 || /invalid authentication credentials/i.test(msg)) {
+        msg = 'Phiên kết nối Google Drive đã hết hạn. Vui lòng mở menu tài khoản → Kết nối lại Google Drive.';
+      }
       const err = new Error(msg);
       err.status = res.status;
       throw err;
@@ -97,7 +100,8 @@ window.DocHubDrive = (() => {
         } else {
           let message=`Lỗi Google Drive API (${xhr.status || 'mạng'})`;
           try { message=JSON.parse(xhr.responseText).error?.message||message; } catch (_) {}
-          if(xhr.status===401)message='Phiên Google Drive đã hết hạn. Vui lòng đăng nhập lại Google.';
+          if(xhr.status===401)message='Phiên kết nối Google Drive đã hết hạn. Vui lòng mở menu tài khoản → Kết nối lại Google Drive.';
+          if(/invalid authentication credentials/i.test(message))message='Phiên kết nối Google Drive đã hết hạn. Vui lòng mở menu tài khoản → Kết nối lại Google Drive.';
           const error=new Error(message);error.status=xhr.status;reject(error);
         }
       };
