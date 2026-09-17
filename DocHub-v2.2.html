@@ -1,6 +1,20 @@
 <!doctype html>
 <html lang="vi">
 <head>
+  <!-- High-Speed Preconnect & DNS-Prefetch -->
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+  <link rel="dns-prefetch" href="https://cdn.jsdelivr.net">
+  <link rel="preconnect" href="https://ethrdeaeemkjgolmkrmq.supabase.co" crossorigin>
+  <link rel="dns-prefetch" href="https://ethrdeaeemkjgolmkrmq.supabase.co">
+  <script>
+    try {
+      if ((typeof localStorage !== 'undefined' && localStorage.getItem('dochub.demo_mode') === 'true') ||
+          (typeof sessionStorage !== 'undefined' && sessionStorage.getItem('dochub.demo_mode') === 'true')) {
+        document.documentElement.classList.add('demo-mode-active');
+      }
+    } catch(_) {}
+  </script>
+
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="color-scheme" content="light dark">
@@ -581,11 +595,12 @@ input[type="radio"][name="quickRole"]:focus-visible{outline:2px solid var(--bran
 .row-meta{font-size:10px;color:var(--muted);max-width:160px}
 .group-badges{display:flex;gap:4px;flex-wrap:wrap;margin-top:6px}
 .group-badges .badge{font-size:9px;padding:2px 6px}
-.stat-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-bottom:22px}
-.stat-card{aspect-ratio:1;min-width:0;box-sizing:border-box;padding:12px;border:1px solid var(--line);border-radius:14px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:7px;background:var(--surface)}
-.stat-card>.icon{color:var(--brand);width:21px;height:21px}
-.stat-card strong{font-size:25px;color:var(--ink);font-weight:650;display:block;margin:0;line-height:1.15}
-.stat-card small{font-size:11px;line-height:1.35;color:var(--muted)}
+.stat-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin-bottom:22px}
+.stat-card{min-width:0;box-sizing:border-box;padding:18px 16px;border:1px solid var(--line);border-radius:14px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:6px;background:var(--surface);transition:all .15s ease}
+.stat-card:hover{border-color:var(--brand);box-shadow:0 2px 8px rgba(0,0,0,.04)}
+.stat-card>.icon{color:var(--brand);width:22px;height:22px}
+.stat-card strong{font-size:26px;color:var(--ink);font-weight:650;display:block;margin:0;line-height:1.15}
+.stat-card small{font-size:11.5px;line-height:1.35;color:var(--muted)}
 .setting-row{display:flex;align-items:center;justify-content:space-between;gap:18px;padding:15px 0;border-bottom:1px solid var(--line)}
 .setting-row:last-child{border-bottom:0}
 .setting-row strong{display:block;color:var(--ink);font-size:12px;font-weight:550}
@@ -881,7 +896,7 @@ body.has-uploads.upload-minimized .toast-stack{bottom:90px}
   .source-list{font-size:10px}
   .matrix-details{font-size:10px}
   .stat-grid{gap:8px}
-  .stat-card{padding:8px;gap:5px;border-radius:12px}
+  .stat-card{aspect-ratio:1;padding:8px;gap:5px;border-radius:12px}
   .stat-card strong{font-size:23px}
   .stat-card small{font-size:10px}
   .settings-list-row{padding:13px;gap:8px;flex-wrap:wrap}
@@ -1714,6 +1729,13 @@ body.auth-locked{overflow:hidden}
 @media(prefers-reduced-motion:reduce){.auth-google{transition:none}.auth-google .auth-spinner{animation-duration:1.4s}}
 
 </style>
+
+  <!-- DocHub Cloud Integrations (Loaded after inline CSS to prevent render-blocking) -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="./assets/client-config.js?v=1789614075667"></script>
+  <script src="./assets/search-engine.js?v=1789614075667"></script>
+  <script src="./assets/google-drive-client.js?v=1789614075667"></script>
+  <script src="./assets/cloud-bridge.js?v=1789614075667"></script>
 </head>
 <body class="auth-locked">
 <a class="skip-link" href="#workspace">Đi tới nội dung chính</a>
@@ -1834,7 +1856,7 @@ body.auth-locked{overflow:hidden}
       <span class="mobile-brand mobile-only">DocHub<span>.</span></span>
       <div class="global-search" id="globalSearchWrap"><svg class="icon"><use href="#i-search"/></svg><input id="globalSearch" type="search" placeholder="Tìm kiếm tài liệu, thư mục..." aria-label="Tìm kiếm toàn bộ tài liệu và thư mục" autocomplete="off"><kbd>Ctrl K</kbd></div>
       <div class="topbar-spacer"></div>
-      <span class="demo-label"><span></span> Bản trải nghiệm</span>
+      <span class="demo-label" id="cloudStatusBadge"><span id="cloudStatusDot"></span> <span id="cloudStatusText">Bản trải nghiệm</span></span>
       <button class="icon-btn phone-only" data-action="toggle-search" aria-label="Mở tìm kiếm"><svg class="icon"><use href="#i-search"/></svg></button>
       <button class="icon-btn topbar-help" data-action="help" aria-label="Hướng dẫn sử dụng" title="Hướng dẫn"><svg class="icon"><use href="#i-help"/></svg></button>
       <button class="icon-btn notification-button" data-action="notifications" aria-label="Xem hoạt động gần đây" title="Hoạt động gần đây"><svg class="icon"><use href="#i-bell"/></svg><span class="notification-dot" id="notificationDot" hidden></span></button>
@@ -1892,28 +1914,7 @@ body.auth-locked{overflow:hidden}
 <noscript><div class="noscript">Vui lòng bật JavaScript để dùng bản mẫu DocHub.</div></noscript>
 <script src="./assets/jszip.min.js"></script>
 <script src="./assets/sample-data.js"></script>
-<script>
-/* Optional same-origin local backend. No third-party document uploads. */
-(() => {
-'use strict';
-let token='',connected=false,revision=0,timer,queue=Promise.resolve(),pending=null,conflict=false;
-const api={get connected(){return connected;},get revision(){return revision;},get conflict(){return conflict;}};
-async function request(path,options={}){if(!connected)throw Error('Chưa kết nối máy chủ cục bộ.');const response=await fetch(path,{...options,headers:{...options.headers,'X-DocHub-Token':token},cache:'no-store'});if(!response.ok){let text;try{text=(await response.json()).detail;}catch(_){text='Máy chủ trả lỗi '+response.status;}const error=Error(text||'Không thể xử lý yêu cầu.');error.status=response.status;throw error;}return response;}
-api.ready=(async()=>{if(!/^https?:$/.test(location.protocol))return false;try{const controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),1800);let r;try{r=await fetch('/api/health',{signal:controller.signal,cache:'no-store'});}finally{clearTimeout(timeout);}if(!r.ok)return false;const info=await r.json();if(info.app!=='dochub-v2')return false;token=info.token;connected=true;return true;}catch(_){return false;}})();
-api.loadState=async()=>{await api.ready;if(!connected)return null;try{const data=await(await request('/api/state')).json();revision=data.revision;return data.state;}catch(error){console.warn('DocHub server state:',error);return null;}};
-api.scheduleState=state=>{if(!connected||conflict)return;pending=JSON.parse(JSON.stringify(state));clearTimeout(timer);timer=setTimeout(()=>api.flush(),250);};
-api.flush=()=>{clearTimeout(timer);if(!pending||conflict||!connected)return queue;const snapshot=pending;pending=null;queue=queue.then(async()=>{if(conflict)return;try{const data=await(await request('/api/state',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({revision,state:snapshot})})).json();revision=data.revision;document.dispatchEvent(new CustomEvent('dochub:sync',{detail:{ok:true}}));}catch(error){if(error.status===409)conflict=true;document.dispatchEvent(new CustomEvent('dochub:sync',{detail:{ok:false,error:error.message}}));}});return queue;};
-api.putAsset=async(id,blob)=>{await request('/api/assets/'+encodeURIComponent(id),{method:'PUT',headers:{'Content-Type':'application/octet-stream'},body:blob});};
-api.getAsset=async id=>{try{return await(await request('/api/assets/'+encodeURIComponent(id))).blob();}catch(error){if(error.status!==404)console.warn(error);return null;}};
-api.removeAsset=async id=>{await request('/api/assets/'+encodeURIComponent(id),{method:'DELETE'});};
-api.reset=async()=>{await request('/api/assets',{method:'DELETE'});};
-api.pdfOpen=async blob=>(await request('/api/pdf',{method:'POST',headers:{'Content-Type':'application/pdf'},body:blob})).json();
-api.pdfPage=async(id,page,width=1200)=>(await request('/api/pdf/'+id+'/page/'+page+'?width='+width)).blob();
-api.pdfExport=async(id,layers)=>(await request('/api/pdf/'+id+'/export',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({layers})})).blob();
-api.pdfClose=async id=>{try{await request('/api/pdf/'+id,{method:'DELETE'});}catch(_){}};
-window.DocHubAPI=api;
-})();
-</script>
+<!-- DocHubAPI is provided by cloud bridge -->
 <script>
 /* DocHub Office Lite. OOXML is read as data; links/macros are never executed.
  * Saves patch existing XML packages instead of reconstructing whole documents.
@@ -3948,8 +3949,93 @@ function openHelp() {
         case 'clear-selection':ui.selected.clear();renderWorkspace();break;
         case 'move-selected':openMove([...ui.selected]);break;
         case 'delete-selected':requestDelete([...ui.selected]);break;
-        case 'account':
-          showMenu(target,`<p class="menu-label">${e(user('u1').name)} · Tài khoản mẫu</p>${menuItem('settings','Cài đặt & phân quyền','settings','','data-section="general"')}${menuItem('backup-all','Xuất bản sao lưu (ZIP)','download')}${menuItem('settings','Giao diện hiển thị','sun','','data-section="appearance"')}${menuItem('help','Giới thiệu bản mẫu','info')}<div class="menu-divider"></div><p class="menu-note">Chưa có chức năng đăng nhập / đăng xuất thật.</p>`);break;
+        case 'account': {
+          const api = window.DocHubAPI;
+          const isConnected = api?.connected;
+          const usr = api?.user;
+          const usrName = usr?.user_metadata?.full_name || usr?.email || user('u1').name;
+          const isDemo = (typeof sessionStorage !== 'undefined' && sessionStorage.getItem('dochub.demo_mode') === 'true') ||
+            (typeof localStorage !== 'undefined' && localStorage.getItem('dochub.demo_mode') === 'true') ||
+            (typeof document !== 'undefined' && document.documentElement.classList.contains('demo-mode-active'));
+          const usrRole = isConnected ? 'Tài khoản đám mây (Cloud + Google Drive)' : isDemo ? 'Bản trải nghiệm Demo (Dữ liệu mẫu)' : 'Tài khoản mẫu cục bộ';
+          
+          let menuHtml = `<p class="menu-label">${e(usrName)} · ${e(usrRole)}</p>`;
+          if(isConnected) menuHtml += menuItem('switch-workspace','Chuyển không gian','building');
+          if (!isConnected) {
+            menuHtml += menuItem('google-auth', 'Đăng nhập Google & Kết nối Drive', 'sparkles');
+          } else if (api?.organization?.role === 'owner' || !api?.organization) {
+            menuHtml += menuItem('google-reconnect', 'Kết nối lại Google Drive', 'sparkles');
+          }
+          menuHtml += menuItem('settings', 'Cài đặt & phân quyền', 'settings', '', 'data-section="general"');
+          menuHtml += menuItem('backup-all', 'Xuất bản sao lưu (ZIP)', 'download');
+          menuHtml += menuItem('settings', 'Giao diện hiển thị', 'sun', '', 'data-section="appearance"');
+          menuHtml += menuItem('help', 'Giới thiệu bản mẫu', 'info');
+          
+          if (isConnected) {
+            menuHtml += `<div class="menu-divider"></div>`;
+            menuHtml += menuItem('google-logout', 'Đăng xuất tài khoản', 'trash');
+          } else if (isDemo) {
+            menuHtml += `<div class="menu-divider"></div>`;
+            menuHtml += menuItem('exit-demo', 'Thoát bản Demo (Quay lại đăng nhập)', 'close');
+          }
+          showMenu(target, menuHtml);
+          break;
+        }
+        case 'exit-demo':
+          try {
+            if (typeof sessionStorage !== 'undefined') {
+              sessionStorage.removeItem('dochub.demo_mode');
+            }
+            if (typeof localStorage !== 'undefined') {
+              localStorage.removeItem('dochub.demo_mode');
+            }
+            if (typeof document !== 'undefined') {
+              document.documentElement.classList.remove('demo-mode-active');
+              document.body.classList.add('auth-locked');
+              const authScr = document.getElementById('authScreen');
+              if (authScr) authScr.hidden = false;
+              const appEl = document.getElementById('app');
+              if (appEl) {
+                appEl.inert = true;
+                appEl.setAttribute('aria-hidden', 'true');
+              }
+            }
+            if (window.location.hash) {
+              history.replaceState(null, '', window.location.pathname);
+            }
+          } catch (_) {}
+          location.reload();
+          break;
+        case 'google-auth':
+          if (window.DocHubAPI?.loginWithGoogle) {
+            try {
+              await window.DocHubAPI.loginWithGoogle();
+            } catch (error) {
+              toast(error?.message || 'Không thể bắt đầu đăng nhập Google.', 'error');
+            }
+          }
+          break;
+        case 'google-reconnect':
+          if (window.DocHubAPI?.loginWithGoogle) {
+            try {
+              await window.DocHubAPI.loginWithGoogle({ reconnectDrive: true });
+            } catch (error) {
+              toast(error?.message || 'Không thể kết nối lại Google Drive.', 'error');
+            }
+          }
+          break;
+        case 'google-logout':
+          if (window.DocHubAPI?.logout) {
+            try {
+              if (typeof sessionStorage !== 'undefined') sessionStorage.removeItem('dochub.demo_mode');
+              if (typeof localStorage !== 'undefined') localStorage.removeItem('dochub.demo_mode');
+              document.documentElement.classList.remove('demo-mode-active');
+              await window.DocHubAPI.logout();
+            } catch (error) {
+              toast(error?.message || 'Không thể đăng xuất.', 'error');
+            }
+          }
+          break;
         case 'backup-all':await backupAll();break;
         case 'notifications':
           $('#notificationDot').hidden=true;
@@ -4636,5 +4722,181 @@ function openHelp() {
 })();
 
 </script>
-</body>
+<script>
+  // Tự động cập nhật giao diện khi trạng thái đăng nhập thay đổi
+  (async () => {
+    const api = window.DocHubAPI;
+    const dot = document.getElementById('cloudStatusDot');
+    const statusText = document.getElementById('cloudStatusText');
+    const statusBadge = document.getElementById('cloudStatusBadge');
+    const profileBtn = document.querySelector('.profile-button');
+    const authScreen = document.getElementById('authScreen');
+    const loginButton = document.getElementById('loginGoogleButton');
+    const loginButtonText = document.getElementById('loginGoogleText');
+    const loginStatus = document.getElementById('loginStatus');
+    const app = document.getElementById('app');
+
+    function lockWorkspace(locked) {
+      document.body.classList.toggle('auth-locked', locked);
+      if (authScreen) authScreen.hidden = !locked;
+      if (app) {
+        app.inert = locked;
+        if (locked) app.setAttribute('aria-hidden', 'true');
+        else app.removeAttribute('aria-hidden');
+      }
+    }
+
+    function renderAuthUi() {
+      if (!api) {
+        lockWorkspace(true);
+        if (authScreen) authScreen.setAttribute('aria-busy', 'false');
+        if (loginButton) loginButton.disabled = true;
+        if (loginButtonText) loginButtonText.textContent = 'Không thể kết nối dịch vụ đăng nhập';
+        if (loginStatus) {
+          loginStatus.textContent = 'Hãy kiểm tra kết nối mạng và tải lại trang.';
+          loginStatus.classList.add('is-error');
+        }
+        return;
+      }
+
+      const connected = api.connected && api.user;
+      const driveConnected = connected && api.isDriveConnected;
+      const hasHashSession = typeof window !== 'undefined' && window.location?.hash?.includes('access_token=');
+      const hasStoredSession = hasHashSession || (typeof localStorage !== 'undefined' && Object.keys(localStorage).some(k => k.startsWith('sb-') && k.endsWith('-auth-token')));
+      const busy = ['redirecting', 'connecting_drive', 'signing_out'].includes(api.authStatus) || (api.authStatus === 'checking' && hasStoredSession);
+      const needsConfig = api.authStatus === 'configuration_required' || api.googleProviderEnabled === false;
+
+      const isDemo = (typeof sessionStorage !== 'undefined' && sessionStorage.getItem('dochub.demo_mode') === 'true') ||
+        (typeof localStorage !== 'undefined' && localStorage.getItem('dochub.demo_mode') === 'true');
+      if (isDemo && !connected) {
+        lockWorkspace(false);
+      } else {
+        lockWorkspace(!connected);
+      }
+      if (authScreen) authScreen.setAttribute('aria-busy', busy ? 'true' : 'false');
+      if (loginButton) {
+        loginButton.disabled = busy || needsConfig;
+        loginButton.classList.toggle('is-busy', busy);
+      }
+      if (loginButtonText) {
+        loginButtonText.textContent = api.authStatus === 'redirecting' ? 'Đang chuyển đến Google…' :
+          api.authStatus === 'checking' && hasStoredSession ? 'Đang kiểm tra phiên đăng nhập…' :
+          api.authStatus === 'signing_out' ? 'Đang đăng xuất…' :
+          needsConfig ? 'Google OAuth chưa được cấu hình' :
+          api.authStatus === 'error' || api.authStatus === 'unavailable' ? 'Thử đăng nhập lại với Google' :
+          'Tiếp tục với Google';
+      }
+      if (loginStatus) {
+        loginStatus.classList.toggle('is-error', needsConfig || api.authStatus === 'error' || api.authStatus === 'unavailable');
+        loginStatus.textContent = busy ? 'Vui lòng chờ trong giây lát.' :
+          needsConfig ? 'Quản trị viên cần hoàn tất cấu hình xác thực Google trên máy chủ.' :
+          api.authError || 'Dùng tài khoản Google đã được tổ chức của bạn cho phép.';
+      }
+
+      if (statusBadge) {
+        statusBadge.style.display = '';
+        if (isDemo && !connected) {
+          statusBadge.title = 'Bản trải nghiệm Demo — Bấm vào đây hoặc ảnh đại diện để mở menu thoát';
+          statusBadge.style.cursor = 'pointer';
+        } else {
+          statusBadge.title = driveConnected ? 'Đã kết nối Cloud' : connected ? 'Đã kết nối máy chủ' : '';
+          statusBadge.style.cursor = '';
+        }
+      }
+      if (statusText) {
+        statusText.textContent = driveConnected ? 'Đã kết nối Cloud' : connected ? 'Đã kết nối máy chủ' : 'Bản trải nghiệm';
+      }
+      if (dot) {
+        dot.style.background = driveConnected || connected ? '#227358' : 'var(--amber)';
+      }
+
+      if (connected && profileBtn) {
+        const u = api.user;
+        const name = u.user_metadata?.full_name || u.user_metadata?.name || u.email;
+        const email = u.email || '';
+        const avatarUrl = u.user_metadata?.avatar_url || u.user_metadata?.picture;
+        const strong = profileBtn.querySelector('strong');
+        const small = profileBtn.querySelector('small');
+        const av = profileBtn.querySelector('.avatar');
+        if (strong) strong.textContent = name;
+        if (small) small.textContent = email;
+        if (av) {
+          const fallback = String(name || 'U').split(/\s+/).filter(Boolean).map(part => part[0]).slice(-2).join('').toUpperCase();
+          if (avatarUrl) {
+            av.dataset.avatarUrl = avatarUrl;
+            av.style.backgroundImage = 'url(' + JSON.stringify(avatarUrl) + ')';
+            av.style.backgroundSize = 'cover';
+            av.style.backgroundPosition = 'center';
+            av.textContent = '';
+            const image = new Image();
+            image.onerror = () => {
+              if (av.dataset.avatarUrl !== avatarUrl) return;
+              av.style.backgroundImage = '';
+              av.textContent = fallback;
+            };
+            image.src = avatarUrl;
+          } else {
+            delete av.dataset.avatarUrl;
+            av.style.backgroundImage = '';
+            av.textContent = fallback;
+          }
+        }
+      }
+    }
+
+    if (loginButton) {
+      loginButton.addEventListener('click', async () => {
+        if (!api?.loginWithGoogle) return;
+        try {
+          loginButton.disabled = true;
+          loginButton.classList.add('is-busy');
+          if (loginButtonText) loginButtonText.textContent = 'Đang chuyển đến Google…';
+          if (loginStatus) {
+            loginStatus.textContent = 'Một cửa sổ đăng nhập an toàn sắp được mở.';
+            loginStatus.classList.remove('is-error');
+          }
+          await api.loginWithGoogle();
+        } catch (error) {
+          if (loginStatus) {
+            loginStatus.textContent = error?.message || 'Không thể bắt đầu đăng nhập Google.';
+            loginStatus.classList.add('is-error');
+          }
+          renderAuthUi();
+        }
+      });
+    }
+
+    const demoButton = document.getElementById('btnEnterDemo');
+    if (demoButton) {
+      demoButton.addEventListener('click', () => {
+        if (typeof sessionStorage !== 'undefined') {
+          sessionStorage.setItem('dochub.demo_mode', 'true');
+        }
+        if (typeof localStorage !== 'undefined') {
+          localStorage.setItem('dochub.demo_mode', 'true');
+        }
+        document.documentElement.classList.add('demo-mode-active');
+        location.reload();
+      });
+    }
+
+    if (statusBadge) {
+      statusBadge.addEventListener('click', () => {
+        const isCurrentDemo = (typeof sessionStorage !== 'undefined' && sessionStorage.getItem('dochub.demo_mode') === 'true') ||
+          (typeof localStorage !== 'undefined' && localStorage.getItem('dochub.demo_mode') === 'true') ||
+          (typeof document !== 'undefined' && document.documentElement.classList.contains('demo-mode-active'));
+        if (isCurrentDemo && (!api || !api.connected)) {
+          const profileBtn = document.querySelector('.profile-button');
+          if (profileBtn) profileBtn.click();
+        }
+      });
+    }
+
+    document.addEventListener('dochub:auth', renderAuthUi);
+    renderAuthUi();
+    if (!api) return;
+    await api.ready;
+    renderAuthUi();
+  })();
+</script></body>
 </html>
