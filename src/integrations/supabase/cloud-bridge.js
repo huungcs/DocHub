@@ -210,6 +210,47 @@ const DEMO_FOLDER_UIDS = Object.freeze([
   async function ensureOrganization() {
     if (!supabase || !currentUser) return null;
     authorizationStatus = 'loading';
+
+    // 0. Check for pending invite code from URL or sessionStorage
+    let pendingInvite = null;
+    try {
+      if (typeof sessionStorage !== 'undefined') pendingInvite = sessionStorage.getItem('dochub_pending_invite');
+      if (!pendingInvite && typeof location !== 'undefined') {
+        pendingInvite = new URLSearchParams(location.search).get('invite');
+      }
+    } catch (_) {}
+
+    if (pendingInvite && pendingInvite.trim()) {
+      try {
+        const { data: joinData, error: joinErr } = await supabase.rpc('dochub_join_organization_by_invite', {
+          p_invite_code: pendingInvite.trim()
+        });
+        if (!joinErr && joinData?.organization_id) {
+          organization = { id: joinData.organization_id, role: joinData.organization_role || 'member' };
+          if (typeof localStorage !== 'undefined') {
+            localStorage.setItem(`dochub.organization.${currentUser.id}`, organization.id);
+          }
+          if (typeof sessionStorage !== 'undefined') {
+            sessionStorage.removeItem('dochub_pending_invite');
+          }
+          if (typeof history !== 'undefined' && typeof location !== 'undefined') {
+            const cleanUrl = new URL(location.href);
+            cleanUrl.searchParams.delete('invite');
+            history.replaceState(null, '', cleanUrl.pathname + (cleanUrl.search ? cleanUrl.search : '') + cleanUrl.hash);
+          }
+          authorizationStatus = 'ready';
+          console.log(`DocHub: Đã tham gia không gian làm việc "${joinData.organization_name}" qua liên kết mời.`);
+          return organization;
+        } else {
+          console.warn('DocHub join invite code failed:', joinErr);
+          if (typeof sessionStorage !== 'undefined') sessionStorage.removeItem('dochub_pending_invite');
+        }
+      } catch (inviteErr) {
+        console.warn('DocHub join invite error:', inviteErr);
+        if (typeof sessionStorage !== 'undefined') sessionStorage.removeItem('dochub_pending_invite');
+      }
+    }
+
     const preferred=typeof localStorage==='undefined'?null:localStorage.getItem(`dochub.organization.${currentUser.id}`);
     if(preferred){
       const {data:member,error:memberError}=await supabase.from('organization_members').select('organization_id,organization_role').eq('user_id',currentUser.id).eq('status','active').eq('organization_id',preferred).maybeSingle();
@@ -217,6 +258,28 @@ const DEMO_FOLDER_UIDS = Object.freeze([
       if(member){organization={id:member.organization_id,role:member.organization_role};authorizationStatus='ready';return organization;}
       localStorage.removeItem(`dochub.organization.${currentUser.id}`);
     }
+
+    // Check if user was already invited by email where user_id is null
+    if (currentUser.email) {
+      try {
+        const { data: emailInvites } = await supabase.from('organization_members')
+          .select('id, organization_id, organization_role')
+          .eq('email', currentUser.email.toLowerCase())
+          .is('user_id', null)
+          .in('status', ['active', 'invited'])
+          .order('created_at', { ascending: false });
+        if (emailInvites && emailInvites.length > 0) {
+          await supabase.from('organization_members')
+            .update({ user_id: currentUser.id, status: 'active' })
+            .eq('id', emailInvites[0].id);
+          organization = { id: emailInvites[0].organization_id, role: emailInvites[0].organization_role };
+          if (typeof localStorage !== 'undefined') localStorage.setItem(`dochub.organization.${currentUser.id}`, organization.id);
+          authorizationStatus = 'ready';
+          return organization;
+        }
+      } catch (_) {}
+    }
+
     const suggestedName = currentUser.user_metadata?.full_name || currentUser.user_metadata?.name || currentUser.email;
     // Check if user is already an active member of an existing organization before creating a new one
     try {
@@ -245,6 +308,38 @@ const DEMO_FOLDER_UIDS = Object.freeze([
     authorizationStatus = organization ? 'ready' : 'error';
     return organization;
   }
+
+  api.getInviteCode = async () => {
+    if (!supabase || !organization) return null;
+    try {
+      const { data, error } = await supabase.rpc('dochub_get_invite_code', { p_organization_id: organization.id });
+      if (!error && data) return data;
+    } catch (_) {}
+    try {
+      const { data, error } = await supabase.from('organizations').select('invite_code').eq('id', organization.id).maybeSingle();
+      if (!error && data?.invite_code) return data.invite_code;
+    } catch (_) {}
+    if (organizationBackend) {
+      try {
+        const res = await (await backend('invite-code')).json();
+        if (res.inviteCode) return res.inviteCode;
+      } catch (_) {}
+    }
+    return null;
+  };
+
+  api.resetInviteCode = async () => {
+    if (!supabase || !organization) return null;
+    try {
+      const { data, error } = await supabase.rpc('dochub_reset_invite_code', { p_organization_id: organization.id });
+      if (!error && data) return data;
+    } catch (_) {}
+    if (organizationBackend) {
+      const res = await (await backend('invite-reset', { method: 'POST' })).json();
+      if (res.inviteCode) return res.inviteCode;
+    }
+    throw new Error('Không thể đặt lại mã mời. Vui lòng kiểm tra quyền quản trị.');
+  };
 
   api.listOrganizations=async()=>{
     if(!currentUser)return [];

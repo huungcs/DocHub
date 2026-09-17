@@ -149,6 +149,13 @@ function createApi(env=process.env,fetcher=fetch,logger=console){
    const url=new URL(req.url,'http://localhost'),c=await authenticate(req,url),action=url.searchParams.get('action');let result;
    if(action==='status'&&req.method==='GET'){
     const rows=await db(`organization_drive_connections?organization_id=eq.${c.org}&select=owner_id`);result={connected:rows[0]?.owner_id===c.organization.owner_id};
+   }else if(action==='invite-code'&&req.method==='GET'){
+    const rows=await db(`organizations?id=eq.${c.org}&select=invite_code`);result={inviteCode:rows[0]?.invite_code||null};
+   }else if(action==='invite-reset'&&req.method==='POST'){
+    if(!['owner','admin'].includes(c.member.organization_role))throw fail(403,'Chỉ quản trị viên mới được đặt lại mã mời.');
+    const crypto=require('crypto');const newCode=crypto.randomBytes(6).toString('hex');
+    await db(`organizations?id=eq.${c.org}`,{method:'PATCH',body:JSON.stringify({invite_code:newCode,updated_at:new Date().toISOString()})});
+    result={inviteCode:newCode};
    }else if(action==='connect'&&req.method==='POST'){
     if(c.user.id!==c.organization.owner_id)throw fail(403,'Chỉ chủ sở hữu được kết nối kho Drive.');
     const input=await body(req);if(typeof input.refreshToken!=='string'||input.refreshToken.length>8192)throw fail(400,'Cần đăng nhập Google lại để cấp kết nối dài hạn.');
