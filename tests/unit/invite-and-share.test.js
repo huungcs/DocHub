@@ -104,7 +104,10 @@ test('Document Share Link: UI template includes direct share copy actions and UR
   assert.ok(templateHtml.includes('Sao chép liên kết xem'), 'Menu label for copying doc link must be present');
 
   // Preview dialog has Copy Link button
-  assert.ok(templateHtml.includes('Sao chép link</button>'), 'Preview dialog must have copy link button');
+  assert.ok(templateHtml.includes('data-action="copy-doc-link"') && templateHtml.includes('Sao chép link'), 'Preview dialog must have copy link button');
+
+  // Mobile hides text on copy link buttons to keep only the icon
+  assert.ok(templateHtml.includes('studio-copy span{display:none') || templateHtml.includes('studio-copy span {display:none'), 'Mobile copy link button must hide text label');
 
   // getDocFromUrl function exists
   assert.ok(templateHtml.includes('function getDocFromUrl()'), 'getDocFromUrl helper must exist');
