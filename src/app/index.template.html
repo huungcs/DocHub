@@ -517,6 +517,9 @@ input[type="radio"][name="quickRole"]:focus-visible{outline:2px solid var(--bran
 .settings-card-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:16px}
 .settings-card-heading h3{font-size:13px}
 .settings-card-heading p{font-size:11px;color:var(--muted);margin-top:4px}
+.invite-card-heading{display:flex;align-items:center;justify-content:space-between;gap:16px}
+.invite-card-copy{flex:1;min-width:0}
+.invite-card-actions{display:flex;align-items:center;gap:8px;flex-shrink:0}
 .settings-card .info-callout{margin-top:15px}
 .folder-select-panel{display:flex;align-items:center;gap:13px;padding:14px 16px;margin-bottom:17px;border:1px solid var(--line);border-radius:10px;background:var(--surface-soft)}
 .folder-select-panel>.heading-symbol{background:var(--surface);color:var(--brand);border:0}
@@ -852,6 +855,14 @@ body.has-uploads.upload-minimized .toast-stack{bottom:90px}
   .settings-card{padding:15px;margin-bottom:15px}
   .settings-card-heading h3{font-size:12px}
   .settings-card-heading .btn{font-size:10.5px;min-height:37px}
+  .invite-card-heading{flex-direction:column;align-items:stretch;gap:12px}
+  .invite-card-copy{width:100%}
+  .invite-card-copy h3{font-size:13px;line-height:1.4}
+  .invite-card-copy p{font-size:11px;line-height:1.6;margin-top:5px}
+  .invite-card-actions{display:flex;align-items:center;gap:8px;width:100%}
+  .invite-card-actions .btn{min-height:41px;font-size:11px;padding:8px 12px;justify-content:center}
+  .invite-card-actions .btn[data-action="copy-invite-link"]{flex:1}
+  .invite-card-actions .btn[data-action="reset-invite-link"]{flex-shrink:0}
   .folder-select-panel{padding:12px;gap:10px}
   .folder-select-panel select{font-size:13px!important}
   .inheritance-row{padding:13px;gap:10px}
@@ -3086,8 +3097,17 @@ window.DocHubMedia={init,open,typeOf,getSession:()=>session};
     const q=normalize(ui.settingsQuery);
     const list=state.users.filter(person=>normalize(`${person.name} ${person.email} ${person.department}`).includes(q));
     const inviteSection = (window.DocHubAPI?.connected && ['owner','admin'].includes(window.DocHubAPI.organization?.role)) ? `
-      <section class="settings-card" style="margin-bottom:16px">
-        <div class="settings-card-heading"><div><h3>${icon('link')} Liên kết mời vào Không gian làm việc</h3><p>Gửi liên kết mời để nhân sự đăng nhập Google và vào thẳng Không gian làm việc của bạn (không bị tạo không gian riêng).</p></div><div style="display:flex;gap:8px"><button class="btn sm primary" data-action="copy-invite-link">${icon('link')}Sao chép link mời</button><button class="btn sm" data-action="reset-invite-link" title="Đổi mã mời mới nếu cần hủy link cũ">${icon('restore')}Đổi mã</button></div></div>
+      <section class="settings-card invite-card" style="margin-bottom:16px">
+        <div class="settings-card-heading invite-card-heading">
+          <div class="invite-card-copy">
+            <h3>${icon('link')} Liên kết mời vào Không gian làm việc</h3>
+            <p>Gửi liên kết mời để nhân sự đăng nhập Google và vào thẳng Không gian làm việc của bạn (không bị tạo không gian riêng).</p>
+          </div>
+          <div class="invite-card-actions">
+            <button class="btn sm primary" data-action="copy-invite-link">${icon('link')}Sao chép link mời</button>
+            <button class="btn sm" data-action="reset-invite-link" title="Đổi mã mời mới nếu cần hủy link cũ">${icon('restore')}Đổi mã</button>
+          </div>
+        </div>
       </section>` : '';
     return `${sectionHeader('Thành viên','Thêm thành viên, chọn nhóm và cấp quyền truy cập thư mục tại một nơi.',`<button class="btn primary" data-action="new-user">${icon('plus')}Thêm người</button>`)}
       ${inviteSection}
